@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>R$ Bloq. no ESTOQUE</title>
+	<link rel="stylesheet" href="style.css">
+	<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+</head>
+<body>
+	<main class="dashboard">
+		<section class="dashboard__filters">
+			<h2 class="dashboard__filters-title">Apresentação &middot; Controle de Estoque</h2>
+		</section>
+		<section class="dashboard__panel">
+			<header class="panel__header">
+				<div class="panel__titles">
+					<h1 class="panel__title">R$ Bloq. no ESTOQUE</h1>
+					<p class="panel__subtitle">Valores apresentados por início e fim de cada mês</p>
+				</div>
+			</header>
+			<section class="chart-card">
+			<div class="chart-card__metrics">
+				<article class="metric-card metric-card--bad" data-metric="largest-positive">
+					<span class="metric-card__label">Maior alta (+)</span>
+					<span class="metric-card__value">&mdash;</span>
+					<span class="metric-card__context">&mdash;</span>
+				</article>
+				<article class="metric-card metric-card--good" data-metric="largest-negative">
+					<span class="metric-card__label">Maior queda (-)</span>
+					<span class="metric-card__value">&mdash;</span>
+					<span class="metric-card__context">&mdash;</span>
+				</article>
+				<article class="metric-card metric-card--trend" data-metric="trend">
+					<span class="metric-card__label">Tendência</span>
+					<span class="metric-card__value">&mdash;</span>
+					<span class="metric-card__context">&mdash;</span>
+				</article>
+				<article class="metric-card metric-card--neutral" data-metric="acumulativo">
+					<span class="metric-card__label">Σ Acumulativo</span>
+					<span class="metric-card__value">&mdash;</span>
+					<span class="metric-card__context">&mdash;</span>
+				</article>
+			</div>
+			<p class="status-message" data-status>Carregando dados...</p>
+			<div class="chart-card__canvas">
+				<canvas id="bloqueadoChart" role="img" aria-label="Gráfico combinado de valores bloqueados e variação percentual"></canvas>
+			</div>
+		</section>
+		</section>
+	</main>
+	<script src="app.js"></script>
+</body>
+</html>
