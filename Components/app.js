@@ -19,6 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const statusElement = document.querySelector("[data-status]");
     metricsDOM = collectMetricElements();
     clearMetrics();
+    initPanelScrollAnimation();
 
     fetch(API_ENDPOINT)
         .then((response) => {
@@ -965,4 +966,38 @@ function externalTooltipHandler(context, helpers) {
     tooltipEl.style.opacity = 1;
     tooltipEl.style.left = `${left}px`;
     tooltipEl.style.top = `${top}px`;
+}
+
+function initPanelScrollAnimation() {
+    const panels = document.querySelectorAll(".panel--animate");
+    if (!panels.length) {
+        return;
+    }
+
+    if (!("IntersectionObserver" in window)) {
+        panels.forEach((panel) => panel.classList.add("is-visible"));
+        return;
+    }
+
+    const observer = new IntersectionObserver(
+        (entries) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add("is-visible");
+                    observer.unobserve(entry.target);
+                }
+            });
+        },
+        {
+            threshold: 0.25,
+        }
+    );
+
+    panels.forEach((panel) => {
+        observer.observe(panel);
+        const rect = panel.getBoundingClientRect();
+        if (rect.top < window.innerHeight * 0.75) {
+            panel.classList.add("is-visible");
+        }
+    });
 }
