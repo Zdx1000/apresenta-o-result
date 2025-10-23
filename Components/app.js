@@ -80,6 +80,8 @@ function renderBloqueadoChart(payload) {
         tooltipBg: styles.getPropertyValue("--color-card-bg").trim() || "#ffffff",
         tooltipBorder: styles.getPropertyValue("--color-axis").trim() || "#7d8597",
         textMain: styles.getPropertyValue("--color-text-main").trim() || "#1f2430",
+        monthHighlightStart: styles.getPropertyValue("--color-highlight-inicio").trim() || "rgba(0, 101, 148, 0.12)",
+        monthHighlightEnd: styles.getPropertyValue("--color-highlight-fim").trim() || "rgba(123, 27, 27, 0.12)",
     };
 
     Chart.defaults.font.family = "Segoe UI, Tahoma, Geneva, Verdana, sans-serif";
@@ -88,6 +90,50 @@ function renderBloqueadoChart(payload) {
     const gradient = canvasElement.getContext("2d").createLinearGradient(0, 0, 0, canvasElement.height);
     gradient.addColorStop(0, colors.primary);
     gradient.addColorStop(1, colors.primary);
+
+    const monthEdgeHighlights = {
+        id: "monthEdgeHighlights",
+        beforeDatasetsDraw(chart) {
+            const meta = chart.getDatasetMeta(0);
+            if (!meta || !meta.data) {
+                return;
+            }
+
+            const { ctx, chartArea } = chart;
+            if (!chartArea) {
+                return;
+            }
+
+            ctx.save();
+            ctx.globalAlpha = 1;
+
+            meta.data.forEach((barElement, index) => {
+                const day = (dayLabels[index] || "").toLowerCase();
+                if (day !== "inicio" && day !== "fim") {
+                    return;
+                }
+
+                const props = barElement.getProps(["x", "width"], true);
+                const centerX = props.x ?? barElement.x;
+                const barWidth = props.width ?? barElement.width ?? 0;
+                if (typeof centerX !== "number" || Number.isNaN(centerX)) {
+                    return;
+                }
+                const safeWidth = typeof barWidth === "number" && !Number.isNaN(barWidth) ? barWidth : 0;
+                const halfWidth = safeWidth / 2;
+                const padding = 12;
+                const left = centerX - halfWidth - padding;
+                const right = centerX + halfWidth + padding;
+                const top = chartArea.top - 6;
+                const height = chartArea.bottom - chartArea.top + 12;
+
+                ctx.fillStyle = day === "inicio" ? colors.monthHighlightStart : colors.monthHighlightEnd;
+                ctx.fillRect(left, top, right - left, height);
+            });
+
+            ctx.restore();
+        },
+    };
 
     const customValueLabels = {
         id: "customValueLabels",
@@ -396,7 +442,17 @@ function renderBloqueadoChart(payload) {
         valueTone: options.valueTone || "neutral",
         emphasize: Boolean(options.emphasize),
         muted: Boolean(options.muted),
+        icon: options.icon || null,
     });
+
+    const tooltipIcons = {
+        value: '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19h14"></path><path d="M8 19V11"></path><path d="M12 19V7"></path><path d="M16 19V13"></path></svg>',
+        percent: '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 17.5l11-11"></path><circle cx="8.5" cy="8.5" r="2.5"></circle><circle cx="15.5" cy="15.5" r="2.5"></circle></svg>',
+        delta: '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 14l5.5-6 3.5 4L19 8"></path><path d="M15 8h4v4"></path></svg>',
+        signal: '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14"></path><path d="M7 13l3-3 3 2 4-5"></path><path d="M17 6h2v2"></path></svg>',
+        sum: '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 6.5h-9l5 5-5 6h9"></path></svg>',
+        compare: '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19h14"></path><path d="M8.5 19V9"></path><path d="M15.5 19V13"></path><path d="M11.5 9l-3-3H8v3"></path><path d="M12.5 13l3 3H16v-3"></path></svg>',
+    };
 
     const getBarTooltipEntries = (index) => {
         const entries = [];
@@ -408,6 +464,7 @@ function renderBloqueadoChart(payload) {
         entries.push(
             createTooltipEntry("Valor atual", currencyFormatter.format(current), {
                 emphasize: true,
+                icon: "value",
             })
         );
 
@@ -415,6 +472,7 @@ function renderBloqueadoChart(payload) {
             entries.push(
                 createTooltipEntry("Acumulativo", currencyFormatter.format(acumulativoAtual), {
                     muted: true,
+                    icon: "sum",
                 })
             );
         }
@@ -423,6 +481,7 @@ function renderBloqueadoChart(payload) {
             entries.push(
                 createTooltipEntry("Δ vs anterior", "Sem histórico", {
                     muted: true,
+                    icon: "delta",
                 })
             );
         } else {
@@ -431,17 +490,20 @@ function renderBloqueadoChart(payload) {
                 createTooltipEntry("Δ vs anterior", deltaText, {
                     arrow: deltaInfo.arrow,
                     arrowTone: deltaInfo.tone,
+                    icon: "delta",
                 })
             );
             entries.push(
                 createTooltipEntry("Sinal", toneDescriptions[deltaInfo.tone] || toneDescriptions.neutral, {
                     muted: true,
+                    icon: "signal",
                 })
             );
             if (index > 0 && payload.labels[index - 1]) {
                 entries.push(
                     createTooltipEntry("Comparado com", payload.labels[index - 1], {
                         muted: true,
+                        icon: "compare",
                     })
                 );
             }
@@ -462,6 +524,7 @@ function renderBloqueadoChart(payload) {
             createTooltipEntry("Percentual", percentageFormatter.format(currentPercent / 100), {
                 valueTone: currentPercent > 0 ? "good" : currentPercent < 0 ? "bad" : "neutral",
                 emphasize: true,
+                icon: "percent",
             })
         );
 
@@ -469,6 +532,7 @@ function renderBloqueadoChart(payload) {
             entries.push(
                 createTooltipEntry("Δ vs anterior", "Sem histórico", {
                     muted: true,
+                    icon: "delta",
                 })
             );
         } else {
@@ -477,17 +541,20 @@ function renderBloqueadoChart(payload) {
                 createTooltipEntry("Δ vs anterior", deltaPercentText, {
                     arrow: deltaInfo.arrow,
                     arrowTone: deltaInfo.tone,
+                    icon: "delta",
                 })
             );
             entries.push(
                 createTooltipEntry("Sinal", toneDescriptions[deltaInfo.tone] || toneDescriptions.neutral, {
                     muted: true,
+                    icon: "signal",
                 })
             );
             if (index > 0 && payload.labels[index - 1]) {
                 entries.push(
                     createTooltipEntry("Comparado com", payload.labels[index - 1], {
                         muted: true,
+                        icon: "compare",
                     })
                 );
             }
@@ -497,6 +564,7 @@ function renderBloqueadoChart(payload) {
             entries.push(
                 createTooltipEntry("Bloq. no estoque", currencyFormatter.format(correspondingBar), {
                     muted: true,
+                    icon: "value",
                 })
             );
         }
@@ -505,6 +573,7 @@ function renderBloqueadoChart(payload) {
             entries.push(
                 createTooltipEntry("Acumulativo", currencyFormatter.format(acumulativoAtual), {
                     muted: true,
+                    icon: "sum",
                 })
             );
         }
@@ -516,6 +585,7 @@ function renderBloqueadoChart(payload) {
         getEntriesForBar: getBarTooltipEntries,
         getEntriesForLine: getLineTooltipEntries,
         toneClassMap,
+        icons: tooltipIcons,
     };
 
     bloqueadoChartInstance = new Chart(canvasElement, {
@@ -605,7 +675,7 @@ function renderBloqueadoChart(payload) {
                 },
             },
         },
-        plugins: [customValueLabels, lineValueLabels],
+        plugins: [monthEdgeHighlights, customValueLabels, lineValueLabels],
     });
 }
 
@@ -814,10 +884,26 @@ function externalTooltipHandler(context, helpers) {
                 itemEl.classList.add("chart-tooltip__item--muted");
             }
 
+            const labelWrapper = document.createElement("span");
+            labelWrapper.className = "chart-tooltip__label-wrap";
+
+            if (entry.icon) {
+                const iconMarkup = helpers.icons && helpers.icons[entry.icon];
+                if (iconMarkup) {
+                    const iconSpan = document.createElement("span");
+                    iconSpan.className = `chart-tooltip__icon chart-tooltip__icon--${entry.icon}`;
+                    iconSpan.setAttribute("aria-hidden", "true");
+                    iconSpan.innerHTML = iconMarkup;
+                    labelWrapper.appendChild(iconSpan);
+                }
+            }
+
             const labelSpan = document.createElement("span");
             labelSpan.className = "chart-tooltip__label";
             labelSpan.textContent = entry.label;
-            itemEl.appendChild(labelSpan);
+            labelWrapper.appendChild(labelSpan);
+
+            itemEl.appendChild(labelWrapper);
 
             const valueWrapper = document.createElement("span");
             valueWrapper.className = "chart-tooltip__value";
@@ -850,8 +936,31 @@ function externalTooltipHandler(context, helpers) {
     const canvasRect = chart.canvas.getBoundingClientRect();
     const parentRect = parent.getBoundingClientRect();
 
-    const left = canvasRect.left - parentRect.left + tooltip.caretX;
-    const top = canvasRect.top - parentRect.top + tooltip.caretY;
+    const tooltipWidth = tooltipEl.offsetWidth || tooltipEl.getBoundingClientRect().width;
+    const tooltipHeight = tooltipEl.offsetHeight || tooltipEl.getBoundingClientRect().height;
+    const margin = 18;
+
+    let left = canvasRect.left - parentRect.left + tooltip.caretX;
+    let top = canvasRect.top - parentRect.top + tooltip.caretY;
+
+    if (tooltipWidth && Number.isFinite(tooltipWidth)) {
+        const halfWidth = tooltipWidth / 2;
+        const minCenter = margin + halfWidth;
+        const maxCenter = parentRect.width - margin - halfWidth;
+        if (minCenter <= maxCenter) {
+            left = Math.min(Math.max(left, minCenter), maxCenter);
+        } else {
+            left = parentRect.width / 2;
+        }
+    }
+
+    if (tooltipHeight && Number.isFinite(tooltipHeight)) {
+        const offsetAbove = tooltipHeight + 18; // matches translateY(-100% - 18px)
+        const minAnchorTop = margin + offsetAbove;
+        if (top < minAnchorTop) {
+            top = minAnchorTop;
+        }
+    }
 
     tooltipEl.style.opacity = 1;
     tooltipEl.style.left = `${left}px`;
