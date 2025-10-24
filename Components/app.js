@@ -790,7 +790,7 @@ function renderBloqueadoChart(payload) {
                             if (day === "fim") {
                                 return colors.tickFim;
                             }
-                            return colors.axis;
+                            return "#000000";
                         },
                     },
                     grid: {
@@ -874,6 +874,13 @@ function prepareCorteDataset(payload) {
     const labels = [];
     const percentages = [];
     const meta = [];
+    const valorTotalValues = [];
+    const cortePedidoValues = [];
+    const faturamentoValues = [];
+
+    const valorTotalCandidates = ["Soma de Valor Total", "Valor Total", "Total", "Valor", "Soma"];
+    const cortePedidoCandidates = ["Corte/Pedido", "Corte por Pedido", "Corte Pedido", "% Corte/Pedido", "% Corte por Pedido"];
+    const faturamentoCandidates = ["FATURAMENTO", "Faturamento", "Total Faturamento", "Soma de Faturamento"];
 
     rows.forEach((row) => {
         if (!row) {
@@ -888,12 +895,32 @@ function prepareCorteDataset(payload) {
 
         const metaValue = parseNumeric(row.META);
         meta.push(metaValue !== null ? metaValue * 100 : null);
+
+        const valorTotalRaw = extractValueFromRow(row, valorTotalCandidates);
+        const valorTotalNumeric = parseNumeric(valorTotalRaw);
+        valorTotalValues.push(valorTotalNumeric);
+
+        const cortePedidoRaw = extractValueFromRow(row, cortePedidoCandidates);
+        let cortePedidoNumeric = parseNumeric(cortePedidoRaw);
+        if (typeof cortePedidoNumeric === "number") {
+            cortePedidoNumeric = Math.abs(cortePedidoNumeric) <= 1 ? cortePedidoNumeric * 100 : cortePedidoNumeric;
+        } else {
+            cortePedidoNumeric = null;
+        }
+        cortePedidoValues.push(cortePedidoNumeric);
+
+        const faturamentoRaw = extractValueFromRow(row, faturamentoCandidates);
+        const faturamentoNumeric = parseNumeric(faturamentoRaw);
+        faturamentoValues.push(faturamentoNumeric);
     });
 
     return {
         labels,
         percentages,
         meta,
+        valorTotal: valorTotalValues,
+        cortePorPedido: cortePedidoValues,
+        faturamento: faturamentoValues,
     };
 }
 
@@ -927,6 +954,13 @@ function renderCorteChart(dataset) {
         tooltipBorder: styles.getPropertyValue("--color-axis").trim() || "#7d8597",
     };
 
+    const deltaToneColors = {
+        good: colors.barLabelNegative,
+        bad: colors.barLabelPositive,
+        neutral: colors.barLabelNeutral,
+        empty: colors.barLabelNeutral,
+    };
+
     let barBackground = colors.primary;
     if (context) {
         const height = canvasElement.height || canvasElement.clientHeight || 320;
@@ -951,23 +985,92 @@ function renderCorteChart(dataset) {
         return null;
     });
 
+    const sanitizedValorTotal = Array.isArray(dataset.valorTotal)
+        ? dataset.valorTotal.map((value) => (typeof value === "number" && Number.isFinite(value) ? value : null))
+        : [];
+
+    const sanitizedCortePedido = Array.isArray(dataset.cortePorPedido)
+        ? dataset.cortePorPedido.map((value) => (typeof value === "number" && Number.isFinite(value) ? value : null))
+        : [];
+
+    const sanitizedFaturamento = Array.isArray(dataset.faturamento)
+        ? dataset.faturamento.map((value) => (typeof value === "number" && Number.isFinite(value) ? value : null))
+        : [];
+
     const positiveValues = sanitizedBars.filter((value) => typeof value === "number");
     const metaValues = sanitizedMeta.filter((value) => typeof value === "number");
     const allValues = [...positiveValues, ...metaValues];
 
     let axisMax = allValues.length ? Math.max(...allValues) : 0;
 
-    if (!Number.isFinite(axisMax) || axisMax === 0) {
-        axisMax = 10;
-    } else {
-        axisMax = axisMax * 1.05;
-    }
+        const epsilon = 0.0001;
+        if (!Number.isFinite(axisMax) || axisMax === 0) {
+            axisMax = 10;
+        } else {
+            axisMax = axisMax * 1.05;
+        }
+
+    const barTones = sanitizedBars.map((current, index) => {
+        if (typeof current !== "number" || !Number.isFinite(current)) {
+            return "neutral";
+        }
+
+        const previous =
+            index > 0 && typeof sanitizedBars[index - 1] === "number" && Number.isFinite(sanitizedBars[index - 1])
+                ? sanitizedBars[index - 1]
+                : null;
+        const metaValue = sanitizedMeta[index];
+
+        let isGood = false;
+        let isBad = false;
+
+        if (previous !== null) {
+            if (current <= previous - epsilon) {
+                isGood = true;
+            } else if (current >= previous + epsilon) {
+                isBad = true;
+            }
+        }
+
+        if (typeof metaValue === "number" && Number.isFinite(metaValue)) {
+            if (current <= metaValue + epsilon) {
+                isGood = true;
+            } else if (current > metaValue + epsilon) {
+                isBad = true;
+            }
+        }
+
+        if (isBad && !isGood) {
+            return "bad";
+        }
+        if (isGood && !isBad) {
+            return "good";
+        }
+        return "neutral";
+    });
+
+    const toneFillMap = {
+        good: "rgba(15, 81, 50, 0.56)",
+        bad: "rgba(122, 0, 12, 0.81)",
+        neutral: barBackground,
+    };
+
+    const toneBorderMap = {
+        good: "rgba(15, 81, 50, 0.82)",
+        bad: "rgba(71, 0, 7, 1)",
+        neutral: colors.primary,
+    };
+
+    const barColors = barTones.map((tone) => toneFillMap[tone] || barBackground);
+    const barBorderColors = barTones.map((tone) => toneBorderMap[tone] || colors.primary);
 
     const tooltipIcons = {
         percent: '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 17.5l11-11"></path><circle cx="8.5" cy="8.5" r="2.5"></circle><circle cx="15.5" cy="15.5" r="2.5"></circle></svg>',
         target: '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="4"></circle><circle cx="12" cy="12" r="1"></circle></svg>',
         delta: '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 14l5.5-6 3.5 4L19 8"></path><path d="M15 8h4v4"></path></svg>',
         compare: '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19h14"></path><path d="M8.5 19V9"></path><path d="M15.5 19V13"></path><path d="M11.5 9l-3-3H8v3"></path><path d="M12.5 13l3 3H16v-3"></path></svg>',
+        value: '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19h14"></path><path d="M8 19V11"></path><path d="M12 19V7"></path><path d="M16 19V13"></path></svg>',
+        sum: '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 6.5h-9l5 5-5 6h9"></path></svg>',
     };
 
     const toneClassMap = {
@@ -977,8 +1080,8 @@ function renderCorteChart(dataset) {
         empty: "neutral",
     };
 
-    const evaluateDelta = (current, target) => {
-        if (target === null || target === undefined) {
+    const evaluateDelta = (current, comparison, { positiveIsBad = true } = {}) => {
+        if (comparison === null || comparison === undefined) {
             return {
                 delta: null,
                 arrow: null,
@@ -986,7 +1089,15 @@ function renderCorteChart(dataset) {
             };
         }
 
-        const delta = current - target;
+        const delta = current - comparison;
+        if (!Number.isFinite(delta)) {
+            return {
+                delta: null,
+                arrow: null,
+                tone: "neutral",
+            };
+        }
+
         if (Math.abs(delta) < 0.0001) {
             return {
                 delta: 0,
@@ -995,10 +1106,18 @@ function renderCorteChart(dataset) {
             };
         }
 
+        const arrow = delta > 0 ? "↑" : "↓";
+        let tone;
+        if (delta > 0) {
+            tone = positiveIsBad ? "bad" : "good";
+        } else {
+            tone = positiveIsBad ? "good" : "bad";
+        }
+
         return {
             delta,
-            arrow: delta > 0 ? "↑" : "↓",
-            tone: delta > 0 ? "bad" : "good",
+            arrow,
+            tone,
         };
     };
 
@@ -1019,12 +1138,69 @@ function renderCorteChart(dataset) {
         const entries = [];
         const current = sanitizedBars[index] ?? 0;
         const metaValue = sanitizedMeta[index];
+        const previousValue = index > 0 && typeof sanitizedBars[index - 1] === "number" ? sanitizedBars[index - 1] : null;
+        const totalValue = sanitizedValorTotal[index];
+        const cortePedidoValue = sanitizedCortePedido[index];
+        const faturamentoValue = sanitizedFaturamento[index];
+
         entries.push(
             createTooltipEntry("Percentual", formatPercent(current), {
                 emphasize: true,
                 icon: "percent",
+                valueTone: barTones[index] || "neutral",
             })
         );
+
+        if (typeof totalValue === "number") {
+            entries.push(
+                createTooltipEntry("Corte de Pedido", currencyFormatter.format(totalValue), {
+                    icon: "sum",
+                    muted: true,
+                })
+            );
+        }
+
+        if (typeof cortePedidoValue === "number") {
+            entries.push(
+                createTooltipEntry("Corte/pedido", formatPercent(cortePedidoValue), {
+                    icon: "percent",
+                    muted: true,
+                })
+            );
+        }
+
+        if (typeof faturamentoValue === "number") {
+            entries.push(
+                createTooltipEntry("Faturamento", currencyFormatter.format(faturamentoValue), {
+                    icon: "value",
+                    muted: true,
+                })
+            );
+        }
+
+        if (previousValue !== null) {
+            entries.push(
+                createTooltipEntry("Mês anterior", formatPercent(previousValue), {
+                    icon: "compare",
+                    muted: true,
+                })
+            );
+
+            const deltaPrevInfo = evaluateDelta(current, previousValue, { positiveIsBad: true });
+            if (deltaPrevInfo.delta !== null) {
+                const deltaPrevText = Math.abs(deltaPrevInfo.delta) < 0.0001
+                    ? "Sem variação"
+                    : formatPercent(Math.abs(deltaPrevInfo.delta));
+                entries.push(
+                    createTooltipEntry("Δ vs anterior", deltaPrevText, {
+                        arrow: deltaPrevInfo.arrow,
+                        arrowTone: deltaPrevInfo.tone,
+                        icon: "delta",
+                        muted: deltaPrevInfo.delta === 0,
+                    })
+                );
+            }
+        }
 
         if (typeof metaValue === "number") {
             entries.push(
@@ -1054,6 +1230,9 @@ function renderCorteChart(dataset) {
         const entries = [];
         const metaValue = sanitizedMeta[index];
         const current = sanitizedBars[index];
+        const totalValue = sanitizedValorTotal[index];
+        const cortePedidoValue = sanitizedCortePedido[index];
+        const faturamentoValue = sanitizedFaturamento[index];
 
         entries.push(
             createTooltipEntry("Meta", formatPercent(metaValue ?? 0), {
@@ -1066,6 +1245,7 @@ function renderCorteChart(dataset) {
             entries.push(
                 createTooltipEntry("Percentual", formatPercent(current), {
                     icon: "percent",
+                    valueTone: barTones[index] || "neutral",
                 })
             );
 
@@ -1081,6 +1261,33 @@ function renderCorteChart(dataset) {
                     })
                 );
             }
+        }
+
+        if (typeof totalValue === "number") {
+            entries.push(
+                createTooltipEntry("Corte de Pedido", currencyFormatter.format(totalValue), {
+                    icon: "sum",
+                    muted: true,
+                })
+            );
+        }
+
+        if (typeof cortePedidoValue === "number") {
+            entries.push(
+                createTooltipEntry("Corte/pedido", formatPercent(cortePedidoValue), {
+                    icon: "percent",
+                    muted: true,
+                })
+            );
+        }
+
+        if (typeof faturamentoValue === "number") {
+            entries.push(
+                createTooltipEntry("Faturamento", currencyFormatter.format(faturamentoValue), {
+                    icon: "value",
+                    muted: true,
+                })
+            );
         }
 
         return entries;
@@ -1105,16 +1312,86 @@ function renderCorteChart(dataset) {
             ctx.save();
             ctx.textAlign = "center";
             ctx.textBaseline = "bottom";
-            ctx.font = "600 12px Segoe UI, Tahoma";
-            ctx.fillStyle = colors.textMain;
+
+            const placedBoxes = [];
+            const labelHeight = 16;
+            const labelMargin = 6;
+
+            const adjustVerticalPosition = (centerX, width, startY) => {
+                let adjustedY = startY;
+                let top = adjustedY - labelHeight;
+                let bottom = adjustedY;
+
+                const overlaps = (box) => {
+                    const horizontalOverlap = centerX - width / 2 < box.right && centerX + width / 2 > box.left;
+                    const verticalOverlap = top < box.bottom + labelMargin && bottom > box.top - labelMargin;
+                    return horizontalOverlap && verticalOverlap;
+                };
+
+                while (placedBoxes.some(overlaps)) {
+                    adjustedY -= labelHeight + labelMargin;
+                    top = adjustedY - labelHeight;
+                    bottom = adjustedY;
+                }
+
+                placedBoxes.push({
+                    left: centerX - width / 2,
+                    right: centerX + width / 2,
+                    top,
+                    bottom,
+                });
+
+                return adjustedY;
+            };
 
             meta.data.forEach((barElement, index) => {
                 const barValue = sanitizedBars[index];
-                if (barElement && typeof barValue === "number") {
-                    const { x, y } = barElement.tooltipPosition();
-                    const label = formatPercent(barValue);
-                    ctx.fillText(label, x, y - 8);
+                if (!barElement || typeof barValue !== "number") {
+                    return;
                 }
+
+                const { x, y } = barElement.tooltipPosition();
+                const valueText = formatPercent(barValue);
+                const previousValue =
+                    index > 0 && typeof sanitizedBars[index - 1] === "number" ? sanitizedBars[index - 1] : null;
+                const deltaInfo = evaluateDelta(barValue, previousValue, { positiveIsBad: true });
+                const arrow = previousValue !== null ? deltaInfo.arrow : "";
+                const arrowColor = deltaToneColors[deltaInfo.tone] || colors.barLabelNeutral;
+                const valueColor = colors.textMain;
+
+                const originalAlign = ctx.textAlign;
+                const originalFont = ctx.font;
+
+                ctx.textAlign = "left";
+                ctx.font = "600 13px Segoe UI, Tahoma";
+                const valueWidth = ctx.measureText(valueText).width;
+
+                let arrowWidth = 0;
+                let spaceWidth = 0;
+                if (arrow) {
+                    ctx.font = "700 13px Segoe UI, Tahoma";
+                    arrowWidth = ctx.measureText(arrow).width;
+                    spaceWidth = ctx.measureText(" ").width;
+                }
+
+                ctx.font = "600 13px Segoe UI, Tahoma";
+                const totalWidth = arrowWidth + spaceWidth + valueWidth;
+                const baseX = x - totalWidth / 2;
+                const adjustedY = adjustVerticalPosition(x, totalWidth, y - 12);
+
+                if (arrow) {
+                    ctx.font = "700 13px Segoe UI, Tahoma";
+                    ctx.fillStyle = arrowColor;
+                    ctx.fillText(arrow, baseX, adjustedY);
+                }
+
+                ctx.font = "600 13px Segoe UI, Tahoma";
+                ctx.fillStyle = valueColor;
+                const valueX = arrow ? baseX + arrowWidth + spaceWidth : baseX;
+                ctx.fillText(valueText, valueX, adjustedY);
+
+                ctx.textAlign = originalAlign;
+                ctx.font = originalFont;
             });
 
             ctx.restore();
@@ -1166,7 +1443,10 @@ function renderCorteChart(dataset) {
                 {
                     label: "% de corte",
                     data: sanitizedBars,
-                    backgroundColor: barBackground,
+                    backgroundColor: barColors,
+                    hoverBackgroundColor: barColors,
+                    borderColor: barBorderColors,
+                    borderWidth: 1,
                     borderRadius: 4,
                     borderSkipped: false,
                     categoryPercentage: 0.62,
@@ -1211,15 +1491,7 @@ function renderCorteChart(dataset) {
             scales: {
                 x: {
                     title: {
-                        display: true,
-                        text: "Mês",
-                        color: colors.axis,
-                        font: {
-                            weight: "600",
-                        },
-                        padding: {
-                            top: 12,
-                        },
+                        display: false,
                     },
                     grid: {
                         display: false,
@@ -1228,7 +1500,7 @@ function renderCorteChart(dataset) {
                         display: false,
                     },
                     ticks: {
-                        color: colors.axis,
+                        color: "#000000",
                         maxRotation: 0,
                         minRotation: 0,
                     },
@@ -1237,15 +1509,7 @@ function renderCorteChart(dataset) {
                     min: 0,
                     suggestedMax: axisMax,
                     title: {
-                        display: true,
-                        text: "%",
-                        color: colors.axis,
-                        font: {
-                            weight: "600",
-                        },
-                        padding: {
-                            bottom: 10,
-                        },
+                        display: false,
                     },
                     ticks: {
                         color: colors.axis,
