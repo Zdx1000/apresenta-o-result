@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 from flask import Flask, jsonify, send_from_directory
@@ -11,6 +12,8 @@ CORS(app)
 BASE_DIR = Path(__file__).resolve().parent
 DATA_FILE = BASE_DIR / "Apresentação.xlsx"
 DATA_SHEET = "Bloqueado por Mês"
+DATA_SHEET_CORTE = "Corte"
+DATA_SHEET_CORTE_2 = "Corte-motivos"
 
 
 def LoadData(file_path, sheet_name):
@@ -47,6 +50,7 @@ def convert_percentage(valor):
 
 def ProcessData(data):
     try:
+        data = data.copy()
         colunas_formatadas = ["R$ Bloq. no ESTOQUE", "Acumulativo", "%"]
         for coluna in colunas_formatadas:
             if coluna == "%":
@@ -88,12 +92,84 @@ def _find_column(dataframe, target_keyword):
     raise KeyError(f"Column containing '{target_keyword}' not found in dataframe")
 
 
-@lru_cache(maxsize=1)
+@lru_cache(maxsize=None)
+def _load_sheet(sheet_name: str):
+    dataframe = LoadData(str(DATA_FILE), sheet_name)
+    if dataframe is None:
+        return None
+    return dataframe
+
+
 def load_processed_dataframe():
-    dataframe = LoadData(str(DATA_FILE), DATA_SHEET)
+    dataframe = _load_sheet(DATA_SHEET)
     if dataframe is None:
         return None
     return ProcessData(dataframe)
+
+
+def load_corte_dataframe():
+    dataframe = _load_sheet(DATA_SHEET_CORTE)
+    if dataframe is None:
+        return None
+    dataframe = dataframe.copy()
+
+    try:
+        if "Rótulos de Linha" in dataframe.columns:
+            dataframe["Rótulos de Linha"] = dataframe["Rótulos de Linha"].astype(str)
+
+        if "Soma de Valor Total" in dataframe.columns:
+            dataframe["Soma de Valor Total"] = dataframe["Soma de Valor Total"].apply(converter_valor)
+
+        if "FATURAMENTO" in dataframe.columns:
+            dataframe["FATURAMENTO"] = dataframe["FATURAMENTO"].apply(converter_valor)
+
+        if "%" in dataframe.columns:
+            dataframe["%"] = dataframe["%"].apply(convert_percentage)
+
+        if "META" in dataframe.columns:
+            dataframe["META"] = dataframe["META"].apply(convert_percentage)
+    except Exception as error:
+        print(f"An error occurred while processing the Corte data: {error}")
+
+    return dataframe
+
+
+def load_corte_motivos_dataframe():
+    dataframe = _load_sheet(DATA_SHEET_CORTE_2)
+    if dataframe is None:
+        return None
+    dataframe = dataframe.copy()
+
+    try:
+        if "Motivos" in dataframe.columns:
+            dataframe["Motivos"] = dataframe["Motivos"].astype(str)
+
+        if "Soma de Valor Total" in dataframe.columns:
+            dataframe["Soma de Valor Total"] = dataframe["Soma de Valor Total"].apply(converter_valor)
+    except Exception as error:
+        print(f"An error occurred while processing the Corte Motivos data: {error}")
+
+    return dataframe
+
+
+def _coerce_value(value: Any):
+    if isinstance(value, pd.Timestamp):
+        return value.isoformat()
+    if pd.isna(value):
+        return None
+    if isinstance(value, (float, int, str, bool)):
+        return value
+    return str(value)
+
+
+def _serialize_dataframe(dataframe: pd.DataFrame):
+    return {
+        "columns": list(dataframe.columns),
+        "rows": [
+            {column: _coerce_value(row[column]) for column in dataframe.columns}
+            for _, row in dataframe.iterrows()
+        ],
+    }
 
 
 @app.route("/api/bloqueado", methods=["GET"])
@@ -162,6 +238,26 @@ def get_bloqueado_mensal():
         },
     }
 
+    return jsonify(payload)
+
+
+@app.route("/api/corte", methods=["GET"])
+def get_corte():
+    dataframe = load_corte_dataframe()
+    if dataframe is None or dataframe.empty:
+        return jsonify({"error": "Dados indisponiveis"}), 500
+
+    payload = _serialize_dataframe(dataframe)
+    return jsonify(payload)
+
+
+@app.route("/api/corte/motivos", methods=["GET"])
+def get_corte_motivos():
+    dataframe = load_corte_motivos_dataframe()
+    if dataframe is None or dataframe.empty:
+        return jsonify({"error": "Dados indisponiveis"}), 500
+
+    payload = _serialize_dataframe(dataframe)
     return jsonify(payload)
 
 

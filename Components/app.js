@@ -1,4 +1,5 @@
-const API_ENDPOINT = "/api/bloqueado";
+const API_ENDPOINT_BLOQUEADO = "/api/bloqueado";
+const API_ENDPOINT_CORTE = "/api/corte";
 
 const currencyFormatter = new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -13,15 +14,23 @@ const percentageFormatter = new Intl.NumberFormat("pt-BR", {
 });
 
 let bloqueadoChartInstance = null;
+let corteChartInstance = null;
 let metricsDOM = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-    const statusElement = document.querySelector("[data-status]");
+    const bloqueadoStatusElement = document.querySelector('[data-status="bloqueado"]');
+    const corteStatusElement = document.querySelector('[data-status="corte"]');
     metricsDOM = collectMetricElements();
     clearMetrics();
-    initPanelScrollAnimation();
+    const panelAnimator = initPanelScrollAnimation();
+    initSlideNavigation(panelAnimator);
 
-    fetch(API_ENDPOINT)
+    loadBloqueadoDataset(bloqueadoStatusElement);
+    loadCorteDataset(corteStatusElement);
+});
+
+function loadBloqueadoDataset(statusElement) {
+    fetch(API_ENDPOINT_BLOQUEADO)
         .then((response) => {
             if (!response.ok) {
                 throw new Error("Falha ao carregar os dados");
@@ -47,7 +56,32 @@ document.addEventListener("DOMContentLoaded", () => {
                 statusElement.classList.remove("status-message--hidden");
             }
         });
-});
+}
+
+function loadCorteDataset(statusElement) {
+    fetch(API_ENDPOINT_CORTE)
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error("Falha ao carregar os dados de corte");
+            }
+            return response.json();
+        })
+        .then((payload) => {
+            const dataset = prepareCorteDataset(payload);
+            renderCorteChart(dataset);
+            if (statusElement) {
+                statusElement.textContent = "";
+                statusElement.classList.add("status-message--hidden");
+            }
+        })
+        .catch((error) => {
+            console.error(error);
+            if (statusElement) {
+                statusElement.textContent = "Nao foi possivel carregar os dados.";
+                statusElement.classList.remove("status-message--hidden");
+            }
+        });
+}
 
 function renderBloqueadoChart(payload) {
     const canvasElement = document.getElementById("bloqueadoChart");
@@ -680,6 +714,239 @@ function renderBloqueadoChart(payload) {
     });
 }
 
+function prepareCorteDataset(payload) {
+    const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+    if (!rows.length) {
+        throw new Error("Formato de dados de corte invalido");
+    }
+
+    const parseNumeric = (value) => {
+        if (value === null || value === undefined || value === "") {
+            return null;
+        }
+        if (typeof value === "number") {
+            return Number.isFinite(value) ? value : null;
+        }
+        if (typeof value === "string") {
+            const cleaned = value.replace(/[^0-9,\-.]/g, "").trim();
+            const hasComma = cleaned.includes(",");
+            const hasDot = cleaned.includes(".");
+            let normalized = cleaned;
+            if (hasComma && hasDot) {
+                normalized = cleaned.replace(/\./g, "").replace(",", ".");
+            } else if (hasComma) {
+                normalized = cleaned.replace(",", ".");
+            }
+            const parsed = Number(normalized);
+            return Number.isFinite(parsed) ? parsed : null;
+        }
+        return null;
+    };
+
+    const labels = [];
+    const percentages = [];
+    const meta = [];
+
+    rows.forEach((row) => {
+        if (!row) {
+            return;
+        }
+
+        const labelRaw = row["Rótulos de Linha"] ?? row["Mês"] ?? row.Mes ?? "";
+        labels.push(labelRaw !== undefined && labelRaw !== null ? String(labelRaw) : "");
+
+        const percentValue = parseNumeric(row["%"]); // stored as ratio (0-1)
+        percentages.push(percentValue !== null ? percentValue * 100 : 0);
+
+        const metaValue = parseNumeric(row.META);
+        meta.push(metaValue !== null ? metaValue * 100 : null);
+    });
+
+    return {
+        labels,
+        percentages,
+        meta,
+    };
+}
+
+function renderCorteChart(dataset) {
+    const canvasElement = document.getElementById("corteChart");
+    if (!canvasElement) {
+        return;
+    }
+
+    if (!dataset || !Array.isArray(dataset.labels) || !dataset.labels.length) {
+        throw new Error("Dados de corte indisponiveis");
+    }
+
+    if (corteChartInstance) {
+        corteChartInstance.destroy();
+    }
+
+    const context = canvasElement.getContext("2d");
+    const styles = getComputedStyle(document.documentElement);
+    const colors = {
+        primary: styles.getPropertyValue("--color-primary").trim() || "#001f54",
+        primarySoft: styles.getPropertyValue("--color-primary-soft").trim() || "rgba(0, 31, 84, 0.72)",
+        axis: styles.getPropertyValue("--color-axis").trim() || "#7d8597",
+        grid: styles.getPropertyValue("--color-grid").trim() || "rgba(0, 31, 84, 0.08)",
+    };
+
+    let barBackground = colors.primary;
+    if (context) {
+        const height = canvasElement.height || canvasElement.clientHeight || 320;
+        const gradient = context.createLinearGradient(0, 0, 0, height);
+        gradient.addColorStop(0, colors.primary);
+        gradient.addColorStop(1, colors.primarySoft);
+        barBackground = gradient;
+    }
+
+    const sanitizedLabels = dataset.labels.map((label) => (label ? label.trim() : "N/A"));
+    const sanitizedBars = dataset.percentages.map((value) => {
+        if (typeof value === "number" && Number.isFinite(value)) {
+            return value;
+        }
+        return 0;
+    });
+
+    const sanitizedMeta = dataset.meta.map((value) => {
+        if (typeof value === "number" && Number.isFinite(value)) {
+            return value;
+        }
+        return null;
+    });
+
+    const positiveValues = sanitizedBars.filter((value) => typeof value === "number");
+    const metaValues = sanitizedMeta.filter((value) => typeof value === "number");
+    const allValues = [...positiveValues, ...metaValues];
+
+    let axisMax = allValues.length ? Math.max(...allValues) : 0;
+
+    if (!Number.isFinite(axisMax) || axisMax === 0) {
+        axisMax = 10;
+    } else {
+        axisMax = axisMax * 1.05;
+    }
+
+    corteChartInstance = new Chart(canvasElement, {
+        type: "bar",
+        data: {
+            labels: sanitizedLabels,
+            datasets: [
+                {
+                    label: "% de corte",
+                    data: sanitizedBars,
+                    backgroundColor: barBackground,
+                    hoverBackgroundColor: colors.primary,
+                    borderRadius: 6,
+                    borderSkipped: false,
+                    categoryPercentage: 0.6,
+                    barPercentage: 0.72,
+                },
+                {
+                    type: "line",
+                    label: "Meta",
+                    data: sanitizedMeta,
+                    borderColor: styles.getPropertyValue("--color-line-positive").trim() || "#1f9d58",
+                    borderWidth: 2,
+                    tension: 0,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    fill: false,
+                    spanGaps: true,
+                    borderDash: [6, 6],
+                    yAxisID: "y",
+                    order: 1,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    labels: {
+                        color: colors.axis,
+                        boxWidth: 16,
+                        boxHeight: 16,
+                        usePointStyle: true,
+                    },
+                },
+                tooltip: {
+                    callbacks: {
+                        label(context) {
+                            const value = typeof context.parsed.y === "number" ? context.parsed.y : 0;
+                            const formattedValue = percentageFormatter.format(value / 100);
+                            const datasetLabel = context.dataset?.label;
+                            return datasetLabel ? `${datasetLabel}: ${formattedValue}` : formattedValue;
+                        },
+                    },
+                },
+            },
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: "Mês",
+                        color: colors.axis,
+                        font: {
+                            weight: "600",
+                        },
+                        padding: {
+                            top: 12,
+                        },
+                    },
+                    grid: {
+                        display: false,
+                    },
+                    border: {
+                        display: false,
+                    },
+                    ticks: {
+                        color: colors.axis,
+                        maxRotation: 0,
+                        minRotation: 0,
+                    },
+                },
+                y: {
+                    min: 0,
+                    suggestedMax: axisMax,
+                    title: {
+                        display: true,
+                        text: "%",
+                        color: colors.axis,
+                        font: {
+                            weight: "600",
+                        },
+                        padding: {
+                            bottom: 10,
+                        },
+                    },
+                    ticks: {
+                        color: colors.axis,
+                        callback: (value) => percentageFormatter.format(value / 100),
+                    },
+                    grid: {
+                        color: colors.grid,
+                        drawBorder: false,
+                    },
+                    border: {
+                        display: false,
+                    },
+                },
+            },
+        },
+    });
+
+    const faturamentoPanel = document.querySelector('[data-slide-id="faturamento"]');
+    if (faturamentoPanel && faturamentoPanel.classList.contains("is-active")) {
+        requestAnimationFrame(() => {
+            corteChartInstance.resize();
+        });
+    }
+}
+
 function collectMetricElements() {
     const buildEntry = (id) => {
         const card = document.querySelector(`[data-metric="${id}"]`);
@@ -969,35 +1236,237 @@ function externalTooltipHandler(context, helpers) {
 }
 
 function initPanelScrollAnimation() {
-    const panels = document.querySelectorAll(".panel--animate");
+    const panels = Array.from(document.querySelectorAll(".panel--animate"));
     if (!panels.length) {
+        return null;
+    }
+
+    const syncVisibility = () => {
+        panels.forEach((panel) => {
+            const shouldShow = panel.classList.contains("is-active") || !panel.dataset.slideId;
+            panel.classList.toggle("is-visible", shouldShow);
+        });
+    };
+
+    syncVisibility();
+
+    return {
+        notifyActiveChange: syncVisibility,
+    };
+}
+
+function initSlideNavigation(panelAnimator) {
+    const slidesContainer = document.querySelector("[data-slides]");
+    if (!slidesContainer) {
         return;
     }
 
-    if (!("IntersectionObserver" in window)) {
-        panels.forEach((panel) => panel.classList.add("is-visible"));
+    const slides = Array.from(slidesContainer.querySelectorAll("[data-slide-id]"));
+    const tabs = Array.from(document.querySelectorAll("[data-slide-target]"));
+
+    if (!slides.length || !tabs.length) {
         return;
     }
 
-    const observer = new IntersectionObserver(
-        (entries) => {
-            entries.forEach((entry) => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add("is-visible");
-                    observer.unobserve(entry.target);
-                }
-            });
-        },
-        {
-            threshold: 0.25,
+    let activeId =
+        slides.find((slide) => slide.classList.contains("is-active"))?.dataset.slideId || slides[0].dataset.slideId;
+    const transitionDuration = 650;
+    let isTransitioning = false;
+    let transitionTimer = null;
+
+    const syncTabs = (targetId) => {
+        tabs.forEach((tab) => {
+            const isActive = tab.dataset.slideTarget === targetId;
+            tab.classList.toggle("is-active", isActive);
+            tab.setAttribute("aria-selected", isActive ? "true" : "false");
+            tab.setAttribute("tabindex", isActive ? "0" : "-1");
+        });
+    };
+
+    const activateSlide = (targetId, { force = false } = {}) => {
+        if (!targetId) {
+            return false;
         }
+
+        if (!force && (targetId === activeId || isTransitioning)) {
+            syncTabs(targetId);
+            return false;
+        }
+
+        const nextSlide = slides.find((slide) => slide.dataset.slideId === targetId);
+        if (!nextSlide) {
+            return false;
+        }
+
+        const currentSlide = slides.find((slide) => slide.dataset.slideId === activeId);
+        if (currentSlide && currentSlide !== nextSlide) {
+            currentSlide.classList.remove("is-active");
+            currentSlide.classList.remove("is-visible");
+        }
+
+        nextSlide.classList.add("is-active");
+        activeId = targetId;
+        syncTabs(targetId);
+
+        if (panelAnimator && typeof panelAnimator.notifyActiveChange === "function") {
+            panelAnimator.notifyActiveChange();
+        } else {
+            nextSlide.classList.add("is-visible");
+        }
+
+        if (targetId === "bloqueado" && bloqueadoChartInstance) {
+            requestAnimationFrame(() => {
+                bloqueadoChartInstance.resize();
+            });
+        }
+
+        if (targetId === "faturamento" && corteChartInstance) {
+            requestAnimationFrame(() => {
+                corteChartInstance.resize();
+            });
+        }
+
+        if (force) {
+            isTransitioning = false;
+            return true;
+        }
+
+        isTransitioning = true;
+        if (transitionTimer) {
+            clearTimeout(transitionTimer);
+        }
+        transitionTimer = window.setTimeout(() => {
+            isTransitioning = false;
+        }, transitionDuration);
+
+        return true;
+    };
+
+    tabs.forEach((tab) => {
+        tab.addEventListener("click", () => activateSlide(tab.dataset.slideTarget));
+        tab.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                activateSlide(tab.dataset.slideTarget);
+            }
+        });
+    });
+
+    const findActiveIndex = () => tabs.findIndex((tab) => tab.dataset.slideTarget === activeId);
+
+    const moveByOffset = (offset, { focusTab = false } = {}) => {
+        if (!offset) {
+            return false;
+        }
+        const currentIndex = findActiveIndex();
+        if (currentIndex === -1 || tabs.length <= 1) {
+            return false;
+        }
+
+        const nextIndex = currentIndex + offset;
+        if (nextIndex < 0 || nextIndex >= tabs.length) {
+            return false;
+        }
+
+        const nextTab = tabs[nextIndex];
+        if (!nextTab) {
+            return false;
+        }
+
+        const activated = activateSlide(nextTab.dataset.slideTarget);
+        if (focusTab && activated) {
+            nextTab.focus();
+        }
+        return activated;
+    };
+
+    const handleWheel = (event) => {
+        if (tabs.length <= 1) {
+            return;
+        }
+
+        const deltaY = event.deltaY;
+        if (!Number.isFinite(deltaY) || Math.abs(deltaY) < 28) {
+            return;
+        }
+        const direction = deltaY > 0 ? 1 : -1;
+        const currentIndex = findActiveIndex();
+        if (currentIndex === -1) {
+            return;
+        }
+
+        const nextIndex = currentIndex + direction;
+        if (nextIndex < 0 || nextIndex >= tabs.length) {
+            return;
+        }
+
+        event.preventDefault();
+        moveByOffset(direction);
+    };
+
+    slidesContainer.addEventListener("wheel", handleWheel, { passive: false });
+
+    let touchStartY = null;
+
+    slidesContainer.addEventListener(
+        "touchstart",
+        (event) => {
+            if (event.touches && event.touches.length === 1) {
+                touchStartY = event.touches[0].clientY;
+            }
+        },
+        { passive: true }
     );
 
-    panels.forEach((panel) => {
-        observer.observe(panel);
-        const rect = panel.getBoundingClientRect();
-        if (rect.top < window.innerHeight * 0.75) {
-            panel.classList.add("is-visible");
+    slidesContainer.addEventListener(
+        "touchmove",
+        (event) => {
+            if (touchStartY === null || !event.touches || event.touches.length !== 1) {
+                return;
+            }
+
+            const currentY = event.touches[0].clientY;
+            const deltaY = touchStartY - currentY;
+            if (Math.abs(deltaY) < 40) {
+                return;
+            }
+
+            event.preventDefault();
+
+            const direction = deltaY > 0 ? 1 : -1;
+            const changed = moveByOffset(direction);
+            if (changed) {
+                touchStartY = null;
+            }
+        },
+        { passive: false }
+    );
+
+    slidesContainer.addEventListener(
+        "touchend",
+        () => {
+            touchStartY = null;
+        },
+        { passive: true }
+    );
+
+    slidesContainer.addEventListener(
+        "touchcancel",
+        () => {
+            touchStartY = null;
+        },
+        { passive: true }
+    );
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
+            return;
         }
+
+        event.preventDefault();
+        const offset = event.key === "ArrowRight" ? 1 : -1;
+        moveByOffset(offset, { focusTab: true });
     });
+
+    activateSlide(activeId, { force: true });
 }

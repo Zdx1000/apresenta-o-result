@@ -5,87 +5,107 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>R$ Bloq. no ESTOQUE</title>
 	<link rel="stylesheet" href="style.css">
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0">
 	<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
 </head>
 <body>
 	<main class="dashboard">
-		<section class="dashboard__filters">
+		<section class="dashboard__filters" role="presentation">
 			<h2 class="dashboard__filters-title">Apresentação &middot; Controle de Estoque</h2>
-		</section>
-		<section class="dashboard__panel dashboard__panel--slide panel--animate">
-			<header class="panel__header">
-				<div class="panel__titles">
-					<h1 class="panel__title">R$ Bloq. no ESTOQUE</h1>
-					<p class="panel__subtitle">Valores apresentados por início e fim de cada mês</p>
-				</div>
-			</header>
-			<section class="chart-card">
-			<div class="chart-card__metrics">
-				<article class="metric-card metric-card--bad" data-metric="largest-positive">
-					<div class="metric-card__header">
-						<span class="metric-card__icon metric-card__icon--up" aria-hidden="true">
-							<svg viewBox="0 0 24 24" role="presentation" focusable="false">
-								<path d="M5.5 16l6-6 3 3 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
-								<path d="M13.5 7.5H19v5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
-							</svg>
-						</span>
-						<span class="metric-card__label">Maior alta (+)</span>
-					</div>
-					<span class="metric-card__value">&mdash;</span>
-					<span class="metric-card__context">&mdash;</span>
-				</article>
-				<article class="metric-card metric-card--good" data-metric="largest-negative">
-					<div class="metric-card__header">
-						<span class="metric-card__icon metric-card__icon--down" aria-hidden="true">
-							<svg viewBox="0 0 24 24" role="presentation" focusable="false">
-								<path d="M5.5 8l6 6 3-3 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
-								<path d="M13.5 16.5H19V11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
-							</svg>
-						</span>
-						<span class="metric-card__label">Maior queda (-)</span>
-					</div>
-					<span class="metric-card__value">&mdash;</span>
-					<span class="metric-card__context">&mdash;</span>
-				</article>
-				<article class="metric-card metric-card--trend" data-metric="trend">
-					<div class="metric-card__header">
-						<span class="metric-card__icon metric-card__icon--trend" aria-hidden="true">
-							<svg viewBox="0 0 24 24" role="presentation" focusable="false">
-								<path d="M5 16l4-5 3 3 7-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
-								<path d="M16 7h3v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
-							</svg>
-						</span>
-						<span class="metric-card__label">Tendência</span>
-					</div>
-					<span class="metric-card__value">&mdash;</span>
-					<span class="metric-card__context">&mdash;</span>
-				</article>
-				<article class="metric-card metric-card--neutral" data-metric="acumulativo">
-					<div class="metric-card__header">
-						<span class="metric-card__icon metric-card__icon--sum" aria-hidden="true">
-							<svg viewBox="0 0 24 24" role="presentation" focusable="false">
-								<path d="M16.5 6.5h-9l5 5.5-5 5.5h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
-							</svg>
-						</span>
-						<span class="metric-card__label">Σ Acumulativo</span>
-					</div>
-					<span class="metric-card__value">&mdash;</span>
-					<span class="metric-card__context">&mdash;</span>
-				</article>
-			</div>
-			<p class="status-message" data-status>Carregando dados...</p>
-			<div class="chart-card__canvas">
-				<canvas id="bloqueadoChart" role="img" aria-label="Gráfico combinado de valores bloqueados e variação percentual"></canvas>
+			<div class="dashboard__filters-actions" role="tablist" aria-label="Selecionar slide">
+				<button type="button" class="dashboard__tab is-active" role="tab" aria-selected="true" aria-controls="slide-bloqueado" data-slide-target="bloqueado">
+					<span class="dashboard__tab-icon material-symbols-rounded" aria-hidden="true">stacked_bar_chart</span>
+					<span class="dashboard__tab-label">R$ Bloq. no ESTOQUE</span>
+				</button>
+				<button type="button" class="dashboard__tab" role="tab" aria-selected="false" aria-controls="slide-faturamento" data-slide-target="faturamento" tabindex="-1">
+					<span class="dashboard__tab-icon material-symbols-rounded" aria-hidden="true">analytics</span>
+					<span class="dashboard__tab-label">Corte por Faturamento</span>
+				</button>
 			</div>
 		</section>
-		</section>
-		<section class="dashboard__panel dashboard__panel--slide panel--animate" aria-labelledby="panel-faturamento-title">
-			<header class="panel__header">
-				<div class="panel__titles">
-					<h1 class="panel__title" id="panel-faturamento-title">Corte por Faturamento</h1>
-				</div>
-			</header>
-		</section>
+		<div class="dashboard__slides" data-slides>
+			<section class="dashboard__panel dashboard__panel--slide panel--animate is-active" id="slide-bloqueado" data-slide-id="bloqueado">
+				<header class="panel__header">
+					<div class="panel__titles">
+						<h1 class="panel__title">R$ Bloq. no ESTOQUE</h1>
+						<p class="panel__subtitle">Valores apresentados por início e fim de cada mês</p>
+					</div>
+				</header>
+				<section class="chart-card">
+					<div class="chart-card__metrics">
+						<article class="metric-card metric-card--bad" data-metric="largest-positive">
+							<div class="metric-card__header">
+								<span class="metric-card__icon metric-card__icon--up" aria-hidden="true">
+									<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+										<path d="M5.5 16l6-6 3 3 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+										<path d="M13.5 7.5H19v5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+									</svg>
+								</span>
+								<span class="metric-card__label">Maior alta (+)</span>
+							</div>
+							<span class="metric-card__value">&mdash;</span>
+							<span class="metric-card__context">&mdash;</span>
+						</article>
+						<article class="metric-card metric-card--good" data-metric="largest-negative">
+							<div class="metric-card__header">
+								<span class="metric-card__icon metric-card__icon--down" aria-hidden="true">
+									<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+										<path d="M5.5 8l6 6 3-3 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+										<path d="M13.5 16.5H19V11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+									</svg>
+								</span>
+								<span class="metric-card__label">Maior queda (-)</span>
+							</div>
+							<span class="metric-card__value">&mdash;</span>
+							<span class="metric-card__context">&mdash;</span>
+						</article>
+						<article class="metric-card metric-card--trend" data-metric="trend">
+							<div class="metric-card__header">
+								<span class="metric-card__icon metric-card__icon--trend" aria-hidden="true">
+									<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+										<path d="M5 16l4-5 3 3 7-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+										<path d="M16 7h3v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+									</svg>
+								</span>
+								<span class="metric-card__label">Tendência</span>
+							</div>
+							<span class="metric-card__value">&mdash;</span>
+							<span class="metric-card__context">&mdash;</span>
+						</article>
+						<article class="metric-card metric-card--neutral" data-metric="acumulativo">
+							<div class="metric-card__header">
+								<span class="metric-card__icon metric-card__icon--sum" aria-hidden="true">
+									<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+										<path d="M16.5 6.5h-9l5 5.5-5 5.5h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+									</svg>
+								</span>
+								<span class="metric-card__label">Σ Acumulativo</span>
+							</div>
+							<span class="metric-card__value">&mdash;</span>
+							<span class="metric-card__context">&mdash;</span>
+						</article>
+					</div>
+					<p class="status-message" data-status="bloqueado">Carregando dados...</p>
+					<div class="chart-card__canvas">
+						<canvas id="bloqueadoChart" role="img" aria-label="Gráfico combinado de valores bloqueados e variação percentual"></canvas>
+					</div>
+				</section>
+			</section>
+			<section class="dashboard__panel dashboard__panel--slide panel--animate" id="slide-faturamento" data-slide-id="faturamento" aria-labelledby="panel-faturamento-title">
+				<header class="panel__header">
+					<div class="panel__titles">
+						<h1 class="panel__title" id="panel-faturamento-title">Corte por Faturamento</h1>
+						<p class="panel__subtitle">Distribuição de cortes planejada para a próxima etapa</p>
+					</div>
+				</header>
+				<section class="chart-card" aria-live="polite">
+					<p class="status-message" data-status="corte">Carregando dados...</p>
+					<div class="chart-card__canvas">
+						<canvas id="corteChart" role="img" aria-label="Percentual de corte por faturamento por mês"></canvas>
+					</div>
+				</section>
+			</section>
+		</div>
 	</main>
 	<script src="app.js"></script>
 </body>
