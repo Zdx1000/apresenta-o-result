@@ -98,10 +98,97 @@
 						<p class="panel__subtitle">Distribuição de cortes planejada para a próxima etapa</p>
 					</div>
 				</header>
-				<section class="chart-card" aria-live="polite">
-					<p class="status-message" data-status="corte">Carregando dados...</p>
-					<div class="chart-card__canvas">
-						<canvas id="corteChart" role="img" aria-label="Percentual de corte por faturamento por mês"></canvas>
+				<section class="chart-card chart-card--split" aria-live="polite">
+					<div class="chart-card__metrics chart-card__metrics--corte">
+						<article class="metric-card metric-card--neutral" data-corte-metric="highest">
+							<div class="metric-card__header">
+								<span class="metric-card__icon metric-card__icon--up" aria-hidden="true">
+									<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+										<path d="M5.5 16l6-6 3 3 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+										<path d="M13.5 7.5H19v5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+									</svg>
+								</span>
+								<span class="metric-card__label">Maior percentual</span>
+							</div>
+							<span class="metric-card__value">&mdash;</span>
+							<span class="metric-card__context">&mdash;</span>
+						</article>
+						<article class="metric-card metric-card--neutral" data-corte-metric="lowest">
+							<div class="metric-card__header">
+								<span class="metric-card__icon metric-card__icon--down" aria-hidden="true">
+									<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+										<path d="M5.5 8l6 6 3-3 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+										<path d="M13.5 16.5H19V11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+									</svg>
+								</span>
+								<span class="metric-card__label">Menor percentual</span>
+							</div>
+							<span class="metric-card__value">&mdash;</span>
+							<span class="metric-card__context">&mdash;</span>
+						</article>
+						<article class="metric-card metric-card--neutral" data-corte-metric="meta-hit">
+							<div class="metric-card__header">
+								<span class="metric-card__icon" aria-hidden="true">
+									<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+										<path d="M5 13l4 4L19 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+										<path d="M5 5h14v14H5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+									</svg>
+								</span>
+								<span class="metric-card__label">Meta atingida</span>
+							</div>
+							<span class="metric-card__value">&mdash;</span>
+							<span class="metric-card__context">&mdash;</span>
+						</article>
+						<article class="metric-card metric-card--neutral" data-corte-metric="meta-gap">
+							<div class="metric-card__header">
+								<span class="metric-card__icon metric-card__icon--trend" aria-hidden="true">
+									<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+										<path d="M5 16l4-5 3 3 7-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+										<path d="M16 7h3v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+									</svg>
+								</span>
+								<span class="metric-card__label">Gap médio x meta</span>
+							</div>
+							<span class="metric-card__value">&mdash;</span>
+							<span class="metric-card__context">&mdash;</span>
+						</article>
+						<article class="metric-card metric-card--neutral" data-corte-metric="top-motivo">
+							<div class="metric-card__header">
+								<span class="metric-card__icon metric-card__icon--sum" aria-hidden="true">
+									<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+										<path d="M16.5 6.5h-9l5 5-5 6h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+									</svg>
+								</span>
+								<span class="metric-card__label">Maior motivo</span>
+							</div>
+							<span class="metric-card__value">&mdash;</span>
+							<span class="metric-card__context">&mdash;</span>
+						</article>
+					</div>
+					<div class="chart-card__layout chart-card__layout--split">
+						<div class="chart-card__aside">
+							<h2 class="chart-card__aside-title">Motivos de Corte</h2>
+							<p class="status-message" data-status="corte-motivos">Carregando motivos...</p>
+							<div class="motivos-table" role="region" aria-live="polite" aria-label="Motivos de corte">
+								<table class="motivos-table__inner">
+									<thead>
+										<tr>
+											<th scope="col">Motivo</th>
+											<th scope="col">Valor total</th>
+										</tr>
+									</thead>
+									<tbody data-motivos-body>
+										<tr class="motivos-table__empty">
+											<td colspan="2">Sem dados disponíveis</td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
+						</div>
+						<div class="chart-card__canvas">
+							<p class="status-message" data-status="corte">Carregando dados...</p>
+							<canvas id="corteChart" role="img" aria-label="Percentual de corte por faturamento por mês"></canvas>
+						</div>
 					</div>
 				</section>
 			</section>
