@@ -16,6 +16,7 @@ DATA_SHEET_CORTE = "Corte"
 DATA_SHEET_CORTE_2 = "Corte-motivos"
 DATA_SHEET_INVENTARIO = "Inventario"
 DATA_SHEET_INVENTARIO_2 = "Inventario - Valores"
+DATA_SHEET_FUNNEL = "Funnel"
 
 
 def LoadData(file_path, sheet_name):
@@ -198,6 +199,24 @@ def load_inventario_valores_dataframe():
     return dataframe
 
 
+def load_funnel_dataframe():
+    dataframe = _load_sheet(DATA_SHEET_FUNNEL)
+    if dataframe is None:
+        return None
+    dataframe = dataframe.copy()
+
+    try:
+        if "Motivos Bloqueio" in dataframe.columns:
+            dataframe["Motivos Bloqueio"] = dataframe["Motivos Bloqueio"].astype(str)
+
+        if "Soma de Valor (BRL)" in dataframe.columns:
+            dataframe["Soma de Valor (BRL)"] = dataframe["Soma de Valor (BRL)"].apply(converter_valor)
+    except Exception as error:
+        print(f"An error occurred while processing the Funnel data: {error}")
+
+    return dataframe
+
+
 def _coerce_value(value: Any):
     if isinstance(value, pd.Timestamp):
         return value.isoformat()
@@ -317,6 +336,76 @@ def get_inventario():
     valores_dataframe = load_inventario_valores_dataframe()
     if valores_dataframe is not None and not valores_dataframe.empty:
         payload["valores"] = _serialize_dataframe(valores_dataframe)
+    return jsonify(payload)
+
+
+@app.route("/api/funnel", methods=["GET"])
+def get_funnel():
+    dataframe = load_funnel_dataframe()
+    if dataframe is None or dataframe.empty:
+        return jsonify({"error": "Dados indisponiveis"}), 500
+
+    motivo_column = _find_column(dataframe, "motivos bloqueio")
+    valor_column = _find_column(dataframe, "soma de valor")
+    try:
+        observacao_column = _find_column(dataframe, "observacao")
+    except KeyError:
+        observacao_column = None
+
+    safe_values = dataframe[valor_column].fillna(0).astype(float)
+    total = float(safe_values.sum())
+
+    grouped = (
+        dataframe[[motivo_column, valor_column]]
+        .groupby(motivo_column, dropna=False, as_index=False)
+        .sum(numeric_only=True)
+    )
+
+    grouped[valor_column] = grouped[valor_column].fillna(0).astype(float)
+    grouped.sort_values(by=valor_column, ascending=False, inplace=True)
+
+    observation_lookup = {}
+    if observacao_column:
+        for _, row in dataframe[[motivo_column, observacao_column]].iterrows():
+            motive_value = row[motivo_column]
+            observation_value = row[observacao_column]
+            motive_key = None if pd.isna(motive_value) else motive_value
+
+            if motive_key in observation_lookup:
+                continue
+
+            if pd.isna(observation_value):
+                continue
+
+            text = str(observation_value).strip()
+            if not text:
+                continue
+
+            observation_lookup[motive_key] = text
+
+    entries = []
+    for _, row in grouped.iterrows():
+        motivo = row[motivo_column]
+        valor = float(row[valor_column])
+        percentage = (valor / total) if total else 0.0
+        motive_key = None if pd.isna(motivo) else motivo
+        label = "Sem motivo"
+        if motivo is not None and not pd.isna(motivo):
+            label = str(motivo)
+        entries.append(
+            {
+                "label": label,
+                "value": valor,
+                "share": percentage,
+                "observation": observation_lookup.get(motive_key),
+            }
+        )
+
+    payload = {
+        "total": total,
+        "entries": entries,
+    }
+
     return jsonify(payload)
 
 

@@ -26,6 +26,7 @@ let corteMotivosSummary = [];
 let inventarioDatasetCache = null;
 let inventarioValoresDOM = null;
 let inventarioMetricsDOM = null;
+let bloqueadoDatasetCache = null;
 
 const MOTIVO_KEY_CANDIDATES = ["Motivos", "Motivo", "Descrição", "Descricao", "Categoria"];
 const VALOR_KEY_CANDIDATES = ["Soma de Valor Total", "Valor Total", "Total", "Valor", "Soma"];
@@ -176,6 +177,7 @@ function loadBloqueadoDataset(statusElement) {
             if (!payload || !Array.isArray(payload.labels)) {
                 throw new Error("Formato de dados invalido");
             }
+            bloqueadoDatasetCache = payload;
             renderMetrics(payload.metrics);
             renderBloqueadoChart(payload);
             if (statusElement) {
@@ -185,6 +187,7 @@ function loadBloqueadoDataset(statusElement) {
         })
         .catch((error) => {
             console.error(error);
+            bloqueadoDatasetCache = null;
             clearMetrics();
             if (statusElement) {
                 statusElement.textContent = "Nao foi possivel carregar os dados.";
@@ -2521,6 +2524,7 @@ function collectMetricElements() {
         "largest-negative": buildEntry("largest-negative"),
         trend: buildEntry("trend"),
         acumulativo: buildEntry("acumulativo"),
+        latest: buildEntry("latest"),
     };
 }
 
@@ -2632,6 +2636,88 @@ function renderMetrics(metrics) {
         formatValue: (total) => currencyFormatter.format(total || 0),
         formatContext: () => "Somatório do período",
         emptyContext: "Sem dados acumulados",
+    });
+
+    updateBloqueadoLatestMetric();
+}
+
+function updateBloqueadoLatestMetric() {
+    if (!metricsDOM || !metricsDOM.latest) {
+        return;
+    }
+
+    const dataset = bloqueadoDatasetCache;
+    const bars = Array.isArray(dataset?.bars) ? dataset.bars : [];
+    const labels = Array.isArray(dataset?.labels) ? dataset.labels : [];
+
+    let latestIndex = -1;
+    for (let index = bars.length - 1; index >= 0; index -= 1) {
+        const value = bars[index];
+        if (typeof value === "number" && Number.isFinite(value)) {
+            latestIndex = index;
+            break;
+        }
+    }
+
+    if (latestIndex === -1) {
+        updateMetricCard(metricsDOM.latest, null, {
+            emptyContext: "Sem histórico recente",
+        });
+        return;
+    }
+
+    const currentValue = bars[latestIndex];
+    const currentLabel = labels[latestIndex] !== undefined && labels[latestIndex] !== null
+        ? String(labels[latestIndex])
+        : "";
+
+    let previousIndex = -1;
+    let previousValue = null;
+    for (let index = latestIndex - 1; index >= 0; index -= 1) {
+        const candidate = bars[index];
+        if (typeof candidate === "number" && Number.isFinite(candidate)) {
+            previousIndex = index;
+            previousValue = candidate;
+            break;
+        }
+    }
+
+    const entry = {
+        value: currentValue,
+        label: currentLabel,
+        previousValue,
+        previousLabel:
+            previousIndex !== -1 && labels[previousIndex] !== undefined && labels[previousIndex] !== null
+                ? String(labels[previousIndex])
+                : "",
+        delta: previousValue !== null ? currentValue - previousValue : null,
+    };
+
+    updateMetricCard(metricsDOM.latest, entry, {
+        defaultTone: "neutral",
+        getArrow: (data) => {
+            if (data.delta === null || Number.isNaN(data.delta)) {
+                return null;
+            }
+            if (Math.abs(data.delta) <= 0.001) {
+                return { char: "→", tone: "neutral" };
+            }
+            return data.delta > 0 ? { char: "↑", tone: "bad" } : { char: "↓", tone: "good" };
+        },
+        formatValue: (data) => currencyFormatter.format(data.value || 0),
+        formatContext: (data) => {
+            const label = data.label || "Último período";
+            if (data.delta === null || Number.isNaN(data.delta) || data.previousValue === null) {
+                return label;
+            }
+            const relation = data.delta > 0 ? "acima" : "abaixo";
+            const deltaText = currencyFormatter.format(Math.abs(data.delta));
+            if (data.previousLabel) {
+                return `${label} · ${relation} ${deltaText} vs ${data.previousLabel}`;
+            }
+            return `${label} · ${relation} ${deltaText}`;
+        },
+        emptyContext: "Sem histórico recente",
     });
 }
 

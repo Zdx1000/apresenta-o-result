@@ -96,6 +96,21 @@
 							<span class="metric-card__value">&mdash;</span>
 							<span class="metric-card__context">&mdash;</span>
 						</article>
+						<article class="metric-card metric-card--neutral" data-metric="latest">
+							<div class="metric-card__header">
+								<span class="metric-card__icon metric-card__icon--current" aria-hidden="true">
+									<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+										<rect x="4.5" y="7" width="15" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></rect>
+										<path d="M8 4v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+										<path d="M16 4v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+										<path d="M4.5 10H19.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+									</svg>
+								</span>
+								<span class="metric-card__label">Bloqueado Atual</span>
+							</div>
+							<span class="metric-card__value">&mdash;</span>
+							<span class="metric-card__context">&mdash;</span>
+						</article>
 					</div>
 					<p class="status-message" data-status="bloqueado">Carregando dados...</p>
 					<div class="chart-card__canvas">
@@ -387,15 +402,86 @@
 						<p class="panel__subtitle">Acompanhamento do funil de bloqueios e liberações</p>
 					</div>
 				</header>
-				<section class="chart-card chart-card--placeholder" aria-live="polite">
-					<div class="chart-card__placeholder">
-						<h2 class="chart-card__placeholder-title">Em breve</h2>
-						<p class="chart-card__placeholder-text">Visualizações do funil de bloqueios estarão disponíveis em breve.</p>
+				<section class="chart-card chart-card--funnel" aria-live="polite">
+					<div class="funnel-summary" aria-live="polite">
+						<h2 class="funnel-summary__title">Resumo do bloqueado</h2>
+						<p class="funnel-summary__total" data-funnel-total="">Total bloqueado: &mdash;</p>
+						<p class="funnel-summary__status" data-status="funnel">Carregando dados...</p>
+						<ul class="funnel-summary__list" data-funnel-breakdown>
+							<li class="funnel-summary__empty">Sem dados disponíveis</li>
+						</ul>
 					</div>
+					<aside class="funnel-metrics" aria-label="Indicadores críticos do funil">
+						<h2 class="funnel-metrics__title">Indicadores críticos</h2>
+						<p class="funnel-metrics__caption">Valores elevados sinalizam maior severidade das restrições.</p>
+						<div class="funnel-metrics__grid">
+							<article class="metric-card metric-card--bad" data-funnel-metric="top-motive">
+								<div class="metric-card__header">
+									<span class="metric-card__icon funnel-metric__icon" aria-hidden="true">
+										<span class="material-symbols-rounded">warning</span>
+									</span>
+									<span class="metric-card__label">Maior motivo</span>
+								</div>
+								<span class="metric-card__value">&mdash;</span>
+								<span class="metric-card__context">&mdash;</span>
+							</article>
+							<article class="metric-card metric-card--bad" data-funnel-metric="top3-share">
+								<div class="metric-card__header">
+									<span class="metric-card__icon funnel-metric__icon" aria-hidden="true">
+										<span class="material-symbols-rounded">stacked_bar_chart</span>
+									</span>
+									<span class="metric-card__label">Top 3 participação</span>
+								</div>
+								<span class="metric-card__value">&mdash;</span>
+								<span class="metric-card__context">&mdash;</span>
+							</article>
+							<article class="metric-card metric-card--bad" data-funnel-metric="average-value">
+								<div class="metric-card__header">
+									<span class="metric-card__icon funnel-metric__icon" aria-hidden="true">
+										<span class="material-symbols-rounded">functions</span>
+									</span>
+									<span class="metric-card__label">Valor médio por motivo</span>
+								</div>
+								<span class="metric-card__value">&mdash;</span>
+								<span class="metric-card__context">&mdash;</span>
+							</article>
+							<article class="metric-card metric-card--bad" data-funnel-metric="critical-count">
+								<div class="metric-card__header">
+									<span class="metric-card__icon funnel-metric__icon" aria-hidden="true">
+										<span class="material-symbols-rounded">rule</span>
+									</span>
+									<span class="metric-card__label">Motivos críticos >=10%</span>
+								</div>
+								<span class="metric-card__value">&mdash;</span>
+								<span class="metric-card__context">&mdash;</span>
+							</article>
+							<article class="metric-card metric-card--bad" data-funnel-metric="hhi">
+								<div class="metric-card__header">
+									<span class="metric-card__icon funnel-metric__icon" aria-hidden="true">
+										<span class="material-symbols-rounded">dataset_linked</span>
+									</span>
+									<span class="metric-card__label">Índice de concentração (HHI)</span>
+								</div>
+								<span class="metric-card__value">&mdash;</span>
+								<span class="metric-card__context">&mdash;</span>
+							</article>
+							<article class="metric-card metric-card--bad" data-funnel-metric="tail-share">
+								<div class="metric-card__header">
+									<span class="metric-card__icon funnel-metric__icon" aria-hidden="true">
+										<span class="material-symbols-rounded">diversity_2</span>
+									</span>
+									<span class="metric-card__label">Demais motivos</span>
+								</div>
+								<span class="metric-card__value">&mdash;</span>
+								<span class="metric-card__context">&mdash;</span>
+							</article>
+						</div>
+					</aside>
 				</section>
 			</section>
 		</div>
 	</main>
-	<script src="app.js"></script>
+		<script src="app.js"></script>
+		<script src="funnel.js"></script>
 </body>
 </html>
