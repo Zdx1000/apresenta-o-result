@@ -21,6 +21,18 @@
 					<span class="dashboard__tab-icon material-symbols-rounded" aria-hidden="true">analytics</span>
 					<span class="dashboard__tab-label">Corte por Faturamento</span>
 				</button>
+				<button type="button" class="dashboard__tab" role="tab" aria-selected="false" aria-controls="slide-inventario" data-slide-target="inventario" tabindex="-1">
+					<span class="dashboard__tab-icon material-symbols-rounded" aria-hidden="true">inventory_2</span>
+					<span class="dashboard__tab-label">Inventário Rotativo</span>
+				</button>
+				<button type="button" class="dashboard__tab" role="tab" aria-selected="false" aria-controls="slide-avaria" data-slide-target="avaria" tabindex="-1">
+					<span class="dashboard__tab-icon material-symbols-rounded" aria-hidden="true">handyman</span>
+					<span class="dashboard__tab-label">Avaria - Recuperados</span>
+				</button>
+				<button type="button" class="dashboard__tab" role="tab" aria-selected="false" aria-controls="slide-funnel" data-slide-target="funnel" tabindex="-1">
+					<span class="dashboard__tab-icon material-symbols-rounded" aria-hidden="true">filter_alt</span>
+					<span class="dashboard__tab-label">Bloqueado Funnel</span>
+				</button>
 			</div>
 		</section>
 		<div class="dashboard__slides" data-slides>
@@ -199,6 +211,186 @@
 							<p class="status-message" data-status="corte">Carregando dados...</p>
 							<canvas id="corteChart" role="img" aria-label="Percentual de corte por faturamento por mês"></canvas>
 						</div>
+					</div>
+				</section>
+			</section>
+			<section class="dashboard__panel dashboard__panel--slide panel--animate" id="slide-inventario" data-slide-id="inventario" aria-labelledby="panel-inventario-title">
+				<header class="panel__header">
+					<div class="panel__titles">
+						<h1 class="panel__title" id="panel-inventario-title">Inventário Rotativo</h1>
+						<p class="panel__subtitle">Cobertura semanal de inventários e divergências encontradas</p>
+					</div>
+				</header>
+				<section class="chart-card indice-chart-card" aria-live="polite" id="inventario-chart-card">
+					<div class="chart-card__metrics chart-card__metrics--corte chart-card__metrics--inventario">
+						<article class="metric-card metric-card--good" data-inventario-metric="highest-coverage">
+							<div class="metric-card__header">
+								<span class="metric-card__icon metric-card__icon--up" aria-hidden="true">
+									<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+										<path d="M5.5 16l5.5-5.5 2.6 2.6L19 8.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+										<path d="M13.5 7.5H19v5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+									</svg>
+								</span>
+								<span class="metric-card__label">Maior cobertura semanal</span>
+							</div>
+							<span class="metric-card__value">&mdash;</span>
+							<span class="metric-card__context">&mdash;</span>
+						</article>
+						<article class="metric-card metric-card--bad" data-inventario-metric="lowest-coverage">
+							<div class="metric-card__header">
+								<span class="metric-card__icon metric-card__icon--down" aria-hidden="true">
+									<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+										<path d="M5.5 8l5.5 5.5 2.6-2.6L19 15.3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+										<path d="M13.5 16.5H19V11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+									</svg>
+								</span>
+								<span class="metric-card__label">Menor cobertura semanal</span>
+							</div>
+							<span class="metric-card__value">&mdash;</span>
+							<span class="metric-card__context">&mdash;</span>
+						</article>
+						<article class="metric-card metric-card--trend" data-inventario-metric="average-coverage">
+							<div class="metric-card__header">
+								<span class="metric-card__icon metric-card__icon--trend" aria-hidden="true">
+									<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+										<path d="M5 16l4-5 3 3 7-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+										<path d="M16 7h3v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+									</svg>
+								</span>
+								<span class="metric-card__label">Cobertura média (YTD)</span>
+							</div>
+							<span class="metric-card__value">&mdash;</span>
+							<span class="metric-card__context">&mdash;</span>
+						</article>
+						<article class="metric-card metric-card--neutral" data-inventario-metric="weeks-on-target">
+							<div class="metric-card__header">
+								<span class="metric-card__icon" aria-hidden="true">
+									<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+										<path d="M5 13l4 4L19 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+										<path d="M5 5h14v14H5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+									</svg>
+								</span>
+								<span class="metric-card__label">Semanas dentro da meta</span>
+							</div>
+							<span class="metric-card__value">&mdash;</span>
+							<span class="metric-card__context">&mdash;</span>
+						</article>
+						<article class="metric-card metric-card--neutral" data-inventario-metric="divergence-index">
+							<div class="metric-card__header">
+								<span class="metric-card__icon metric-card__icon--sum" aria-hidden="true">
+									<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+										<path d="M16.5 6.5h-9l5 5-5 6h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+									</svg>
+								</span>
+								<span class="metric-card__label">Índice de divergências</span>
+							</div>
+							<span class="metric-card__value">&mdash;</span>
+							<span class="metric-card__context">&mdash;</span>
+						</article>
+					</div>
+					<div class="indice-chart-card__layout indice-chart-card__layout--single">
+						<aside class="inventario-values-card" id="inventario-values-card" aria-live="polite" aria-label="Inventário - Valores" hidden aria-hidden="true">
+							<h2 class="inventario-values-card__title">Inventário - Valores</h2>
+							<div class="inventario-values-card__section inventario-values-card__section--two">
+								<div class="inventario-values-card__item inventario-values-card__item--ano">
+									<span class="inventario-values-card__label">
+										<span class="inventario-values-card__icon material-symbols-rounded" aria-hidden="true">calendar_month</span>
+										Ano
+									</span>
+									<span class="inventario-values-card__value" data-inventario-info="ano">&mdash;</span>
+								</div>
+								<div class="inventario-values-card__item inventario-values-card__item--unidade">
+									<span class="inventario-values-card__label">
+										<span class="inventario-values-card__icon material-symbols-rounded" aria-hidden="true">store</span>
+										Unidade
+									</span>
+									<span class="inventario-values-card__value" data-inventario-info="unidade">&mdash;</span>
+								</div>
+							</div>
+							<div class="inventario-values-card__section">
+								<div class="inventario-values-card__item inventario-values-card__item--estoque">
+									<span class="inventario-values-card__label">
+										<span class="inventario-values-card__icon material-symbols-rounded" aria-hidden="true">inventory_2</span>
+										Estoque Contado Acumulado
+									</span>
+									<span class="inventario-values-card__value" data-inventario-info="estoque">&mdash;</span>
+								</div>
+							</div>
+							<div class="inventario-values-card__section inventario-values-card__section--two">
+								<div class="inventario-values-card__item inventario-values-card__item--falta">
+									<span class="inventario-values-card__label">
+										<span class="inventario-values-card__icon material-symbols-rounded" aria-hidden="true">trending_down</span>
+										11 Ajuste Inv. Falta
+									</span>
+									<span class="inventario-values-card__value" data-inventario-info="falta">&mdash;</span>
+								</div>
+								<div class="inventario-values-card__item inventario-values-card__item--sobra">
+									<span class="inventario-values-card__label">
+										<span class="inventario-values-card__icon material-symbols-rounded" aria-hidden="true">trending_up</span>
+										5 Ajuste Inv. Sobra
+									</span>
+									<span class="inventario-values-card__value" data-inventario-info="sobra">&mdash;</span>
+								</div>
+							</div>
+							<div class="inventario-values-card__section inventario-values-card__section--three">
+								<div class="inventario-values-card__item inventario-values-card__item--valor-absoluto">
+									<span class="inventario-values-card__label">
+										<span class="inventario-values-card__icon material-symbols-rounded" aria-hidden="true">payments</span>
+										Valor Absoluto
+									</span>
+									<span class="inventario-values-card__value" data-inventario-info="valor-absoluto">&mdash;</span>
+								</div>
+								<div class="inventario-values-card__item inventario-values-card__item--valor-modular">
+									<span class="inventario-values-card__label">
+										<span class="inventario-values-card__icon material-symbols-rounded" aria-hidden="true">calculate</span>
+										Valor Modular
+									</span>
+									<span class="inventario-values-card__value" data-inventario-info="valor-modular">&mdash;</span>
+								</div>
+								<div class="inventario-values-card__item inventario-values-card__item--percentual">
+									<span class="inventario-values-card__label">
+										<span class="inventario-values-card__icon material-symbols-rounded" aria-hidden="true">percent</span>
+										% Ajuste
+									</span>
+									<span class="inventario-values-card__value" data-inventario-info="percentual-ajuste">&mdash;</span>
+								</div>
+							</div>
+						</aside>
+						<div class="indice-chart-card__body">
+							<p class="status-message" data-status="inventario">Carregando dados...</p>
+							<div class="indice-chart-card__chart" id="inventario-chart">
+								<canvas id="inventarioChart" role="img" aria-label="Percentual realizado do inventário rotativo"></canvas>
+							</div>
+							<p class="indice-chart-card__empty" id="inventario-chart-empty" hidden>Nenhum dado disponível no período selecionado.</p>
+						</div>
+					</div>
+				</section>
+			</section>
+			<section class="dashboard__panel dashboard__panel--slide panel--animate" id="slide-avaria" data-slide-id="avaria" aria-labelledby="panel-avaria-title">
+				<header class="panel__header">
+					<div class="panel__titles">
+						<h1 class="panel__title" id="panel-avaria-title">Avaria - Recuperados</h1>
+						<p class="panel__subtitle">Indicadores de recuperação de produtos avariados</p>
+					</div>
+				</header>
+				<section class="chart-card chart-card--placeholder" aria-live="polite">
+					<div class="chart-card__placeholder">
+						<h2 class="chart-card__placeholder-title">Em breve</h2>
+						<p class="chart-card__placeholder-text">Esta seção apresentará dados de avarias recuperadas em uma próxima atualização.</p>
+					</div>
+				</section>
+			</section>
+			<section class="dashboard__panel dashboard__panel--slide panel--animate" id="slide-funnel" data-slide-id="funnel" aria-labelledby="panel-funnel-title">
+				<header class="panel__header">
+					<div class="panel__titles">
+						<h1 class="panel__title" id="panel-funnel-title">Bloqueado Funnel</h1>
+						<p class="panel__subtitle">Acompanhamento do funil de bloqueios e liberações</p>
+					</div>
+				</header>
+				<section class="chart-card chart-card--placeholder" aria-live="polite">
+					<div class="chart-card__placeholder">
+						<h2 class="chart-card__placeholder-title">Em breve</h2>
+						<p class="chart-card__placeholder-text">Visualizações do funil de bloqueios estarão disponíveis em breve.</p>
 					</div>
 				</section>
 			</section>

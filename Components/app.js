@@ -1,6 +1,7 @@
 const API_ENDPOINT_BLOQUEADO = "/api/bloqueado";
 const API_ENDPOINT_CORTE = "/api/corte";
 const API_ENDPOINT_CORTE_MOTIVOS = "/api/corte/motivos";
+const API_ENDPOINT_INVENTARIO = "/api/inventario";
 
 const currencyFormatter = new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -16,14 +17,30 @@ const percentageFormatter = new Intl.NumberFormat("pt-BR", {
 
 let bloqueadoChartInstance = null;
 let corteChartInstance = null;
+let inventarioChartInstance = null;
 let metricsDOM = null;
 let corteMetricsDOM = null;
 let motivosTableBody = null;
 let corteDatasetCache = null;
 let corteMotivosSummary = [];
+let inventarioDatasetCache = null;
+let inventarioValoresDOM = null;
+let inventarioMetricsDOM = null;
 
 const MOTIVO_KEY_CANDIDATES = ["Motivos", "Motivo", "Descrição", "Descricao", "Categoria"];
 const VALOR_KEY_CANDIDATES = ["Soma de Valor Total", "Valor Total", "Total", "Valor", "Soma"];
+const INVENTARIO_LABEL_CANDIDATES = ["Semana", "Período", "Periodo", "Ciclo", "Mês", "Mes", "Data", "Inventario"];
+const INVENTARIO_REALIZADO_CANDIDATES = ["Realizado", "Realizacao", "Resultado"];
+const INVENTARIO_META_CANDIDATES = ["Meta", "Objetivo", "Target"];
+
+const INVENTARIO_VALORES_ANO_CANDIDATES = ["Ano"];
+const INVENTARIO_VALORES_UNIDADE_CANDIDATES = ["Unidade", "Filial", "Centro", "Loja"];
+const INVENTARIO_VALORES_ESTOQUE_CANDIDATES = ["Estoque Contado Acumulado", "Estoque Contado", "Estoque Acumulado"];
+const INVENTARIO_VALORES_AJUSTE_FALTA_CANDIDATES = ["11 Ajuste Inv. Falta", "Ajuste Falta"];
+const INVENTARIO_VALORES_AJUSTE_SOBRA_CANDIDATES = ["5 Ajuste Inv. Sobra", "Ajuste Sobra"];
+const INVENTARIO_VALORES_ABSOLUTO_CANDIDATES = ["Valor Absoluto"];
+const INVENTARIO_VALORES_MODULAR_CANDIDATES = ["Valor Modular"];
+const INVENTARIO_VALORES_PERCENT_CANDIDATES = ["% Ajuste", "Percentual Ajuste"];
 
 const normalizeKeyName = (key) => {
     if (typeof key !== "string") {
@@ -61,6 +78,23 @@ const extractValueFromRow = (row, candidates) => {
     }
 
     return null;
+};
+
+const findColumnByCandidates = (columns, candidates) => {
+    if (!Array.isArray(columns) || !Array.isArray(candidates)) {
+        return null;
+    }
+
+    const normalizedCandidates = candidates
+        .map((candidate) => normalizeKeyName(candidate))
+        .filter(Boolean);
+
+    return (
+        columns.find((column) => {
+            const normalizedColumn = normalizeKeyName(column);
+            return normalizedCandidates.some((candidate) => normalizedColumn.includes(candidate));
+        }) ?? null
+    );
 };
 
 const parseNumericValue = (value) => {
@@ -111,17 +145,23 @@ document.addEventListener("DOMContentLoaded", () => {
     const bloqueadoStatusElement = document.querySelector('[data-status="bloqueado"]');
     const corteStatusElement = document.querySelector('[data-status="corte"]');
     const corteMotivosStatusElement = document.querySelector('[data-status="corte-motivos"]');
+    const inventarioStatusElement = document.querySelector('[data-status="inventario"]');
     motivosTableBody = document.querySelector("[data-motivos-body]");
     metricsDOM = collectMetricElements();
     corteMetricsDOM = collectCorteMetricElements();
+    inventarioMetricsDOM = collectInventarioMetricElements();
+    inventarioValoresDOM = collectInventarioValoresElements();
     clearMetrics();
     clearCorteMetrics();
+    clearInventarioMetrics();
+    resetInventarioValoresCard();
     const panelAnimator = initPanelScrollAnimation();
     initSlideNavigation(panelAnimator);
 
     loadBloqueadoDataset(bloqueadoStatusElement);
     loadCorteDataset(corteStatusElement);
     loadCorteMotivosDataset(corteMotivosStatusElement);
+    loadInventarioDataset(inventarioStatusElement);
 });
 
 function loadBloqueadoDataset(statusElement) {
@@ -209,6 +249,889 @@ function loadCorteMotivosDataset(statusElement) {
                 statusElement.classList.remove("status-message--hidden");
             }
         });
+}
+
+function loadInventarioDataset(statusElement) {
+    fetch(API_ENDPOINT_INVENTARIO)
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error("Falha ao carregar os dados de inventario");
+            }
+            return response.json();
+        })
+        .then((payload) => {
+            renderInventarioValoresCard(payload?.valores);
+            const dataset = prepareInventarioDataset(payload);
+            inventarioDatasetCache = dataset;
+            renderInventarioChart(dataset);
+            updateInventarioMetrics();
+            if (statusElement) {
+                statusElement.textContent = "";
+                statusElement.classList.add("status-message--hidden");
+            }
+        })
+        .catch((error) => {
+            console.error(error);
+            inventarioDatasetCache = null;
+            if (inventarioChartInstance) {
+                inventarioChartInstance.destroy();
+                inventarioChartInstance = null;
+            }
+            resetInventarioValoresCard();
+            updateInventarioMetrics();
+            if (statusElement) {
+                statusElement.textContent = "Nao foi possivel carregar os dados.";
+                statusElement.classList.remove("status-message--hidden");
+            }
+        });
+}
+
+function prepareInventarioDataset(payload) {
+    const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+    if (!rows.length) {
+        throw new Error("Dados de inventario indisponiveis");
+    }
+
+    const columns = Array.isArray(payload?.columns) && payload.columns.length
+        ? payload.columns
+        : Object.keys(rows[0] ?? {});
+
+    if (!columns.length) {
+        throw new Error("Colunas de inventario nao encontradas");
+    }
+
+    const realizedColumn = findColumnByCandidates(columns, INVENTARIO_REALIZADO_CANDIDATES);
+    if (!realizedColumn) {
+        throw new Error("Coluna de realizado nao encontrada");
+    }
+
+    const metaColumn = findColumnByCandidates(columns, INVENTARIO_META_CANDIDATES);
+
+    const candidateLabelColumns = columns.filter((column) => column !== realizedColumn && column !== metaColumn);
+    let labelColumn = findColumnByCandidates(candidateLabelColumns, INVENTARIO_LABEL_CANDIDATES);
+
+    if (!labelColumn) {
+        labelColumn = candidateLabelColumns.find((column) =>
+            rows.some((row) => {
+                const value = row?.[column];
+                if (value === null || value === undefined) {
+                    return false;
+                }
+                if (typeof value === "string") {
+                    return value.trim() !== "";
+                }
+                return typeof value !== "number";
+            })
+        );
+    }
+
+    if (!labelColumn) {
+        labelColumn = candidateLabelColumns[0] || realizedColumn;
+    }
+
+    const toPercentValue = (value) => {
+        const numeric = parseNumericValue(value);
+        if (numeric === null) {
+            return null;
+        }
+        return Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
+    };
+
+    const labels = rows.map((row, index) => {
+        const raw = row?.[labelColumn];
+        if (raw === null || raw === undefined || raw === "") {
+            return `Item ${index + 1}`;
+        }
+        return String(raw);
+    });
+
+    const realizadoValues = rows.map((row) => toPercentValue(row?.[realizedColumn]));
+    const metaValues = metaColumn ? rows.map((row) => toPercentValue(row?.[metaColumn])) : [];
+
+    return {
+        labels,
+        realizado: realizadoValues,
+        meta: metaValues,
+    };
+}
+
+function prepareInventarioValoresSummary(payload) {
+    const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+    if (!rows.length) {
+        return null;
+    }
+
+    const columns = Array.isArray(payload?.columns) && payload.columns.length
+        ? payload.columns
+        : Object.keys(rows[0] ?? {});
+
+    if (!columns.length) {
+        return null;
+    }
+
+    const columnRefs = {
+        ano: findColumnByCandidates(columns, INVENTARIO_VALORES_ANO_CANDIDATES),
+        unidade: findColumnByCandidates(columns, INVENTARIO_VALORES_UNIDADE_CANDIDATES),
+        estoque: findColumnByCandidates(columns, INVENTARIO_VALORES_ESTOQUE_CANDIDATES),
+        falta: findColumnByCandidates(columns, INVENTARIO_VALORES_AJUSTE_FALTA_CANDIDATES),
+        sobra: findColumnByCandidates(columns, INVENTARIO_VALORES_AJUSTE_SOBRA_CANDIDATES),
+        valorAbsoluto: findColumnByCandidates(columns, INVENTARIO_VALORES_ABSOLUTO_CANDIDATES),
+        valorModular: findColumnByCandidates(columns, INVENTARIO_VALORES_MODULAR_CANDIDATES),
+        percentualAjuste: findColumnByCandidates(columns, INVENTARIO_VALORES_PERCENT_CANDIDATES),
+    };
+
+    const anoValues = new Set();
+    const unidadeValues = new Set();
+
+    const totals = {
+        estoque: { value: 0, has: false },
+        falta: { value: 0, has: false },
+        sobra: { value: 0, has: false },
+        valorAbsoluto: { value: 0, has: false },
+        valorModular: { value: 0, has: false },
+    };
+
+    const percentValues = [];
+
+    rows.forEach((row) => {
+        if (!row) {
+            return;
+        }
+
+        if (columnRefs.ano) {
+            const rawAno = row[columnRefs.ano];
+            if (rawAno !== null && rawAno !== undefined && rawAno !== "") {
+                anoValues.add(String(rawAno));
+            }
+        }
+
+        if (columnRefs.unidade) {
+            const rawUnidade = row[columnRefs.unidade];
+            if (rawUnidade !== null && rawUnidade !== undefined && rawUnidade !== "") {
+                unidadeValues.add(String(rawUnidade));
+            }
+        }
+
+        const addNumeric = (columnName, targetKey) => {
+            if (!columnName) {
+                return;
+            }
+            const numeric = parseNumericValue(row[columnName]);
+            if (numeric === null) {
+                return;
+            }
+            totals[targetKey].value += numeric;
+            totals[targetKey].has = true;
+        };
+
+        addNumeric(columnRefs.estoque, "estoque");
+        addNumeric(columnRefs.falta, "falta");
+        addNumeric(columnRefs.sobra, "sobra");
+        addNumeric(columnRefs.valorAbsoluto, "valorAbsoluto");
+        addNumeric(columnRefs.valorModular, "valorModular");
+
+        if (columnRefs.percentualAjuste) {
+            const rawPercent = row[columnRefs.percentualAjuste];
+            let numericPercent = null;
+            if (typeof rawPercent === "number") {
+                numericPercent = rawPercent;
+            } else {
+                numericPercent = parseNumericValue(rawPercent);
+            }
+            if (numericPercent !== null) {
+                const normalizedPercent = Math.abs(numericPercent) > 1 ? numericPercent / 100 : numericPercent;
+                percentValues.push(normalizedPercent);
+            }
+        }
+    });
+
+    const summarizeSet = (valuesSet) => {
+        if (!valuesSet || valuesSet.size === 0) {
+            return null;
+        }
+        if (valuesSet.size <= 3) {
+            return Array.from(valuesSet).join(", ");
+        }
+        const values = Array.from(valuesSet);
+        return `${values.slice(0, 2).join(", ")} +${valuesSet.size - 2}`;
+    };
+
+    const percentualAjuste = percentValues.length
+        ? percentValues.reduce((sum, value) => sum + value, 0) / percentValues.length
+        : null;
+
+    return {
+        ano: summarizeSet(anoValues),
+        unidade: summarizeSet(unidadeValues),
+        estoque: totals.estoque.has ? totals.estoque.value : null,
+        falta: totals.falta.has ? totals.falta.value : null,
+        sobra: totals.sobra.has ? totals.sobra.value : null,
+        valorAbsoluto: totals.valorAbsoluto.has ? totals.valorAbsoluto.value : null,
+        valorModular: totals.valorModular.has ? totals.valorModular.value : null,
+        percentualAjuste,
+    };
+}
+
+const INVENTARIO_CHART_COLORS = {
+    hitBorder: "#009100ff",
+    missBorder: "#DC2626",
+    neutralBorder: "#4B5563",
+    line: "#ecb418ff",
+    hitFill: "rgba(4, 102, 17, 1)",
+    missFill: "rgba(224, 15, 15, 1)",
+    neutralFill: "rgba(75, 85, 99, 1)",
+};
+
+const INVENTARIO_LINE_OVER_BARS_PLUGIN = {
+    id: "inventarioLineOverBars",
+    afterDatasetsDraw: (chart) => {
+        if (!chart?.canvas || chart.canvas.id !== "inventarioChart") {
+            return;
+        }
+        const metas = chart.getSortedVisibleDatasetMetas().filter((meta) => meta.type === "line");
+        if (!metas.length) {
+            return;
+        }
+        const { ctx } = chart;
+        ctx.save();
+        metas.forEach((meta) => {
+            if (meta.hidden) {
+                return;
+            }
+            meta.dataset.draw(ctx);
+            meta.data.forEach((element) => {
+                if (typeof element.draw === "function") {
+                    element.draw(ctx);
+                }
+            });
+        });
+        ctx.restore();
+    },
+};
+
+const INVENTARIO_VALUE_LABELS_PLUGIN = {
+    id: "inventarioValueLabels",
+    afterDatasetsDraw: (chart) => {
+        if (!chart?.canvas || chart.canvas.id !== "inventarioChart") {
+            return;
+        }
+        const metas = chart.getSortedVisibleDatasetMetas();
+        if (!metas.length) {
+            return;
+        }
+
+        const barMetas = metas.filter((meta) => meta.type === "bar" && !meta.hidden);
+        const lineMetas = metas.filter((meta) => meta.type === "line" && !meta.hidden);
+
+        if (!barMetas.length && !lineMetas.length) {
+            return;
+        }
+
+        const { ctx } = chart;
+        ctx.save();
+        ctx.textBaseline = "bottom";
+        ctx.textAlign = "center";
+        ctx.font = "600 11px 'Segoe UI', Tahoma";
+
+        const labelPaddingX = 8;
+        const labelPaddingY = 4;
+        const labelMargin = 6;
+        const placedBoxes = [];
+
+        const addPlacement = (centerX, width, height, startY) => {
+            let adjustedY = startY;
+            let top = adjustedY - height;
+            let bottom = adjustedY;
+
+            const overlaps = (box) => {
+                const horizontalOverlap = centerX - width / 2 < box.right && centerX + width / 2 > box.left;
+                const verticalOverlap = top < box.bottom + labelMargin && bottom > box.top - labelMargin;
+                return horizontalOverlap && verticalOverlap;
+            };
+
+            while (placedBoxes.some(overlaps)) {
+                adjustedY -= height + labelMargin;
+                top = adjustedY - height;
+                bottom = adjustedY;
+            }
+
+            placedBoxes.push({
+                left: centerX - width / 2,
+                right: centerX + width / 2,
+                top,
+                bottom,
+            });
+
+            return adjustedY;
+        };
+
+        const drawRoundedRect = (x, y, width, height, radius, fillStyle, strokeStyle) => {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+            ctx.fillStyle = fillStyle;
+            ctx.fill();
+            ctx.strokeStyle = strokeStyle;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        };
+
+        const drawLabel = (text, x, y, accentColor) => {
+            ctx.font = "600 11px 'Segoe UI', Tahoma";
+            const textMetrics = ctx.measureText(text);
+            const textWidth = textMetrics.width;
+            const textHeight = 11;
+            const boxWidth = textWidth + labelPaddingX * 2;
+            const boxHeight = textHeight + labelPaddingY * 2;
+            const adjustedY = addPlacement(x, boxWidth, boxHeight, y - 8);
+            const boxX = x - boxWidth / 2;
+            const boxY = adjustedY - boxHeight;
+
+            drawRoundedRect(boxX, boxY, boxWidth, boxHeight, 6, "rgba(255, 255, 255, 0.92)", accentColor);
+
+            ctx.fillStyle = accentColor;
+            ctx.fillText(text, x, boxY + boxHeight - labelPaddingY);
+        };
+
+        barMetas.forEach((meta) => {
+            const dataset = chart.data.datasets[meta.index];
+            const color = dataset?.borderColor || "#1f2937";
+
+            meta.data.forEach((element, index) => {
+                const value = dataset?.data?.[index];
+                if (!Number.isFinite(value)) {
+                    return;
+                }
+
+                const { x, y } = element.tooltipPosition();
+                const label = `${Number.parseFloat(value).toFixed(2)}%`;
+                drawLabel(label, x, y, color);
+            });
+        });
+
+        lineMetas.forEach((meta) => {
+            const dataset = chart.data.datasets[meta.index];
+            const lineData = Array.isArray(dataset?.data) ? dataset.data : [];
+            let lastNonNullIndex = -1;
+            for (let i = lineData.length - 1; i >= 0; i -= 1) {
+                if (Number.isFinite(lineData[i])) {
+                    lastNonNullIndex = i;
+                    break;
+                }
+            }
+
+            if (lastNonNullIndex === -1) {
+                return;
+            }
+
+            const pointElement = meta.data[lastNonNullIndex];
+            if (!pointElement) {
+                return;
+            }
+
+            const { x, y } = pointElement.tooltipPosition();
+            const label = `${Number.parseFloat(lineData[lastNonNullIndex]).toFixed(2)}%`;
+            const accent = dataset?.borderColor || INVENTARIO_CHART_COLORS.line;
+            drawLabel(label, x, y, accent);
+        });
+
+        ctx.restore();
+    },
+};
+
+function collectInventarioValoresElements() {
+    const layout = document.querySelector("#inventario-chart-card .indice-chart-card__layout");
+    const card = document.getElementById("inventario-values-card");
+    if (!card) {
+        return null;
+    }
+
+    const queryField = (name) => card.querySelector(`[data-inventario-info="${name}"]`);
+
+    return {
+        layout,
+        card,
+        ano: queryField("ano"),
+        unidade: queryField("unidade"),
+        estoque: queryField("estoque"),
+        falta: queryField("falta"),
+        sobra: queryField("sobra"),
+        valorAbsoluto: queryField("valor-absoluto"),
+        valorModular: queryField("valor-modular"),
+        percentualAjuste: queryField("percentual-ajuste"),
+    };
+}
+
+function resetInventarioValoresCard() {
+    if (!inventarioValoresDOM) {
+        inventarioValoresDOM = collectInventarioValoresElements();
+    }
+
+    const dom = inventarioValoresDOM;
+    if (!dom || !dom.card) {
+        return;
+    }
+
+    const fields = [
+        dom.ano,
+        dom.unidade,
+        dom.estoque,
+        dom.falta,
+        dom.sobra,
+        dom.valorAbsoluto,
+        dom.valorModular,
+        dom.percentualAjuste,
+    ];
+
+    fields.forEach((element) => {
+        if (element) {
+            element.textContent = "—";
+        }
+    });
+
+    dom.card.hidden = true;
+    dom.card.setAttribute("aria-hidden", "true");
+    if (dom.layout) {
+        dom.layout.classList.add("indice-chart-card__layout--single");
+    }
+}
+
+function renderInventarioValoresCard(valoresPayload) {
+    if (!inventarioValoresDOM) {
+        inventarioValoresDOM = collectInventarioValoresElements();
+    }
+
+    const dom = inventarioValoresDOM;
+    if (!dom || !dom.card) {
+        return;
+    }
+
+    const summary = prepareInventarioValoresSummary(valoresPayload);
+    if (!summary) {
+        resetInventarioValoresCard();
+        return;
+    }
+
+    const setFieldValue = (element, value, mode = "text") => {
+        if (!element) {
+            return;
+        }
+        if (value === null || value === undefined || (typeof value === "number" && !Number.isFinite(value))) {
+            element.textContent = "—";
+            return;
+        }
+
+        switch (mode) {
+            case "currency":
+                element.textContent = currencyFormatter.format(value);
+                break;
+            case "percent":
+                element.textContent = percentageFormatter.format(value);
+                break;
+            default:
+                element.textContent = String(value);
+                break;
+        }
+    };
+
+    dom.card.hidden = false;
+    dom.card.setAttribute("aria-hidden", "false");
+    if (dom.layout) {
+        dom.layout.classList.remove("indice-chart-card__layout--single");
+    }
+
+    setFieldValue(dom.ano, summary.ano);
+    setFieldValue(dom.unidade, summary.unidade);
+    setFieldValue(dom.estoque, summary.estoque, "currency");
+    setFieldValue(dom.falta, summary.falta, "currency");
+    setFieldValue(dom.sobra, summary.sobra, "currency");
+    setFieldValue(dom.valorAbsoluto, summary.valorAbsoluto, "currency");
+    setFieldValue(dom.valorModular, summary.valorModular, "currency");
+    setFieldValue(dom.percentualAjuste, summary.percentualAjuste, "percent");
+}
+
+function getInventarioChartElements() {
+    const chartCard = document.getElementById("inventario-chart-card");
+    const chartContainer = document.getElementById("inventario-chart");
+    const canvas = document.getElementById("inventarioChart");
+    const emptyState = document.getElementById("inventario-chart-empty");
+    const legend = chartCard ? chartCard.querySelector(".indice-chart-card__legend") : null;
+    const legendItems = legend
+        ? {
+              semMeta: legend.querySelector('[data-legend="sem-meta"]') || null,
+              atingiu: legend.querySelector('[data-legend="atingiu"]') || null,
+              naoAtingiu: legend.querySelector('[data-legend="nao-atingiu"]') || null,
+          }
+        : null;
+    return { chartCard, chartContainer, canvas, emptyState, legend, legendItems };
+}
+
+function formatInventarioPercent(value) {
+    if (value === null || value === undefined || !Number.isFinite(value)) {
+        return null;
+    }
+    return Number.parseFloat(value.toFixed(2));
+}
+
+function toggleInventarioEmptyState(shouldShow) {
+    const { chartContainer, emptyState, legend, legendItems } = getInventarioChartElements();
+    if (!chartContainer || !emptyState) {
+        return;
+    }
+    if (shouldShow) {
+        emptyState.hidden = false;
+        chartContainer.classList.add("is-hidden");
+        if (legend) {
+            legend.hidden = true;
+            legend.setAttribute("aria-hidden", "true");
+        }
+        if (legendItems) {
+            Object.values(legendItems).forEach((item) => {
+                if (item) {
+                    item.classList.add("is-hidden");
+                }
+            });
+        }
+    } else {
+        emptyState.hidden = true;
+        chartContainer.classList.remove("is-hidden");
+        if (legend) {
+            legend.hidden = false;
+            legend.setAttribute("aria-hidden", "false");
+        }
+    }
+}
+
+function ensureInventarioPlugins() {
+    return Boolean(window.Chart);
+}
+
+function updateInventarioLegendState(indicadores) {
+    const { legend, legendItems } = getInventarioChartElements();
+    if (!legend || !legendItems) {
+        return;
+    }
+    const temAlgum = indicadores.semMeta || indicadores.atingiu || indicadores.naoAtingiu;
+    legend.hidden = !temAlgum;
+    legend.setAttribute("aria-hidden", temAlgum ? "false" : "true");
+    if (!temAlgum) {
+        Object.values(legendItems).forEach((item) => {
+            if (item) {
+                item.classList.add("is-hidden");
+            }
+        });
+        return;
+    }
+    if (legendItems.semMeta) {
+        legendItems.semMeta.classList.toggle("is-hidden", !indicadores.semMeta);
+    }
+    if (legendItems.atingiu) {
+        legendItems.atingiu.classList.toggle("is-hidden", !indicadores.atingiu);
+    }
+    if (legendItems.naoAtingiu) {
+        legendItems.naoAtingiu.classList.toggle("is-hidden", !indicadores.naoAtingiu);
+    }
+}
+
+function buildInventarioChartConfig(registros, metaPadrao) {
+    const labels = registros.map((item) => item.mes);
+    const dadosAtingiu = [];
+    const dadosNaoAtingiu = [];
+    const dadosSemMeta = [];
+    const linhaMeta = [];
+
+    registros.forEach((item) => {
+        const percentual = formatInventarioPercent(item.percent);
+        const metaReferencia = Number.isFinite(item.meta)
+            ? formatInventarioPercent(item.meta)
+            : Number.isFinite(metaPadrao)
+            ? formatInventarioPercent(metaPadrao)
+            : null;
+
+        if (metaReferencia === null) {
+            dadosAtingiu.push(null);
+            dadosNaoAtingiu.push(null);
+            dadosSemMeta.push(percentual);
+            linhaMeta.push(null);
+            return;
+        }
+
+        linhaMeta.push(metaReferencia);
+
+        if (percentual !== null && percentual <= metaReferencia) {
+            dadosAtingiu.push(percentual);
+            dadosNaoAtingiu.push(null);
+            dadosSemMeta.push(null);
+        } else if (percentual !== null) {
+            dadosAtingiu.push(null);
+            dadosNaoAtingiu.push(percentual);
+            dadosSemMeta.push(null);
+        } else {
+            dadosAtingiu.push(null);
+            dadosNaoAtingiu.push(null);
+            dadosSemMeta.push(null);
+        }
+    });
+
+    const temSemMeta = dadosSemMeta.some((valor) => Number.isFinite(valor));
+    const temAtingiu = dadosAtingiu.some((valor) => Number.isFinite(valor));
+    const temNaoAtingiu = dadosNaoAtingiu.some((valor) => Number.isFinite(valor));
+    const temMeta = linhaMeta.some((valor) => Number.isFinite(valor));
+
+    const datasets = [];
+
+    if (temSemMeta) {
+        datasets.push({
+            type: "bar",
+            label: "Sem meta",
+            data: dadosSemMeta,
+            backgroundColor: INVENTARIO_CHART_COLORS.neutralFill,
+            borderColor: INVENTARIO_CHART_COLORS.neutralBorder,
+            borderWidth: 0,
+            borderRadius: 2,
+            borderSkipped: false,
+            stack: "percentual",
+            maxBarThickness: 70,
+            order: 1,
+        });
+    }
+
+    if (temAtingiu) {
+        datasets.push({
+            type: "bar",
+            label: "Atingiu meta",
+            data: dadosAtingiu,
+            backgroundColor: INVENTARIO_CHART_COLORS.hitFill,
+            borderColor: INVENTARIO_CHART_COLORS.hitBorder,
+            borderWidth: 0,
+            borderRadius: 2,
+            borderSkipped: false,
+            stack: "percentual",
+            maxBarThickness: 70,
+            order: 1,
+        });
+    }
+
+    if (temNaoAtingiu) {
+        datasets.push({
+            type: "bar",
+            label: "Nao atingiu meta",
+            data: dadosNaoAtingiu,
+            backgroundColor: INVENTARIO_CHART_COLORS.missFill,
+            borderColor: INVENTARIO_CHART_COLORS.missBorder,
+            borderWidth: 0,
+            borderRadius: 2,
+            borderSkipped: false,
+            stack: "percentual",
+            maxBarThickness: 70,
+            order: 1,
+        });
+    }
+
+    if (temMeta) {
+        datasets.push({
+            type: "line",
+            label: "Meta",
+            data: linhaMeta.map((valor) => (Number.isFinite(valor) ? valor : null)),
+            borderColor: INVENTARIO_CHART_COLORS.line,
+            backgroundColor: INVENTARIO_CHART_COLORS.line,
+            borderWidth: 3,
+            pointRadius: 4,
+            pointHoverRadius: 5,
+            pointBackgroundColor: INVENTARIO_CHART_COLORS.line,
+            pointBorderColor: "#ffffff",
+            pointBorderWidth: 1.5,
+            spanGaps: false,
+            tension: 0.35,
+            order: 99,
+            stack: "meta-line",
+            clip: false,
+        });
+    }
+
+    const possuiSeries = datasets.some(
+        (dataset) => Array.isArray(dataset.data) && dataset.data.some((valor) => Number.isFinite(valor))
+    );
+
+    const config = {
+        type: "bar",
+        data: {
+            labels,
+            datasets,
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: "index",
+                intersect: false,
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    grid: {
+                        display: false,
+                    },
+                    ticks: {
+                        color: "#000000",
+                        font: {
+                            size: 12,
+                        },
+                    },
+                },
+                y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    grid: {
+                        color: "rgba(15, 23, 42, 0.08)",
+                        drawBorder: false,
+                    },
+                    ticks: {
+                        color: "rgba(15, 23, 42, 0.65)",
+                        font: {
+                            size: 12,
+                        },
+                        callback: (value) => {
+                            if (!Number.isFinite(value)) {
+                                return "";
+                            }
+                            return `${Number.parseFloat(value).toFixed(2)}%`;
+                        },
+                    },
+                },
+            },
+            plugins: {
+                legend: {
+                    display: false,
+                },
+                tooltip: {
+                    mode: "index",
+                    intersect: false,
+                    callbacks: {
+                        label: (context) => {
+                            const value = context?.parsed?.y;
+                            if (!Number.isFinite(value)) {
+                                return undefined;
+                            }
+                            const datasetLabel = context.dataset?.label || "";
+                            const formatted = `${value.toFixed(2)}%`;
+                            return datasetLabel ? `${datasetLabel}: ${formatted}` : formatted;
+                        },
+                    },
+                },
+            },
+        },
+        plugins: [INVENTARIO_LINE_OVER_BARS_PLUGIN, INVENTARIO_VALUE_LABELS_PLUGIN],
+    };
+
+    return {
+        config,
+        possuiSeries,
+        indicadoresLegenda: {
+            semMeta: temSemMeta,
+            atingiu: temAtingiu,
+            naoAtingiu: temNaoAtingiu,
+        },
+    };
+}
+
+function renderInventarioChart(dataset) {
+    const { canvas } = getInventarioChartElements();
+    if (!canvas) {
+        return;
+    }
+
+    if (!dataset || !Array.isArray(dataset.labels) || !dataset.labels.length) {
+        throw new Error("Dados de inventario indisponiveis");
+    }
+
+    if (!ensureInventarioPlugins()) {
+        console.error("Chart.js nao foi carregado. Verifique o script externo.");
+        return;
+    }
+
+    const realizedValues = Array.isArray(dataset.realizado) ? dataset.realizado : [];
+    const metaValues = Array.isArray(dataset.meta) ? dataset.meta : [];
+
+    const registros = dataset.labels.map((label, index) => {
+        const percentValue = typeof realizedValues[index] === "number" && Number.isFinite(realizedValues[index])
+            ? realizedValues[index]
+            : null;
+        const metaValue = typeof metaValues[index] === "number" && Number.isFinite(metaValues[index])
+            ? metaValues[index]
+            : null;
+        return {
+            mes: label !== null && label !== undefined && label !== "" ? String(label) : `Item ${index + 1}`,
+            percent: percentValue,
+            meta: metaValue,
+        };
+    });
+
+    const registrosValidos = registros.filter((row) => row.mes && Number.isFinite(row.percent));
+    if (!registrosValidos.length) {
+        if (inventarioChartInstance) {
+            inventarioChartInstance.destroy();
+            inventarioChartInstance = null;
+        }
+        toggleInventarioEmptyState(true);
+        updateInventarioLegendState({ semMeta: false, atingiu: false, naoAtingiu: false });
+        return;
+    }
+
+    const metaPadrao = registrosValidos.map((row) => row.meta).find((value) => Number.isFinite(value)) ?? null;
+    const { config, possuiSeries, indicadoresLegenda } = buildInventarioChartConfig(registrosValidos, metaPadrao);
+
+    if (!possuiSeries) {
+        if (inventarioChartInstance) {
+            inventarioChartInstance.destroy();
+            inventarioChartInstance = null;
+        }
+        toggleInventarioEmptyState(true);
+        updateInventarioLegendState({ semMeta: false, atingiu: false, naoAtingiu: false });
+        return;
+    }
+
+    toggleInventarioEmptyState(false);
+    updateInventarioLegendState(indicadoresLegenda);
+
+    if (inventarioChartInstance) {
+        inventarioChartInstance.destroy();
+        inventarioChartInstance = null;
+    }
+
+    const context = canvas.getContext("2d");
+    if (!context) {
+        console.error("Contexto 2D do canvas indisponivel para o grafico de inventario.");
+        toggleInventarioEmptyState(true);
+        updateInventarioLegendState({ semMeta: false, atingiu: false, naoAtingiu: false });
+        return;
+    }
+
+    try {
+        inventarioChartInstance = new Chart(context, config);
+    } catch (error) {
+        console.error("Falha ao renderizar grafico de inventario.", error);
+        toggleInventarioEmptyState(true);
+        updateInventarioLegendState({ semMeta: false, atingiu: false, naoAtingiu: false });
+        return;
+    }
+
+    const inventarioPanel = document.querySelector('[data-slide-id="inventario"]');
+    if (inventarioPanel && inventarioPanel.classList.contains("is-active")) {
+        requestAnimationFrame(() => {
+            if (inventarioChartInstance) {
+                inventarioChartInstance.resize();
+            }
+        });
+    }
 }
 
 function renderBloqueadoChart(payload) {
@@ -1627,6 +2550,32 @@ function collectCorteMetricElements() {
     }, {});
 }
 
+function collectInventarioMetricElements() {
+    const mapping = [
+        ["highest-coverage", "highestCoverage"],
+        ["lowest-coverage", "lowestCoverage"],
+        ["average-coverage", "averageCoverage"],
+        ["weeks-on-target", "weeksOnTarget"],
+        ["divergence-index", "divergenceIndex"],
+    ];
+
+    return mapping.reduce((accumulator, [selector, key]) => {
+        const card = document.querySelector(`[data-inventario-metric="${selector}"]`);
+        if (!card) {
+            accumulator[key] = null;
+            return accumulator;
+        }
+
+        accumulator[key] = {
+            card,
+            value: card.querySelector(".metric-card__value"),
+            context: card.querySelector(".metric-card__context"),
+        };
+
+        return accumulator;
+    }, {});
+}
+
 function renderMetrics(metrics) {
     if (!metricsDOM) {
         return;
@@ -1761,6 +2710,332 @@ function clearCorteMetrics() {
         entry.value.innerHTML = '<span class="metric-card__value-text">&mdash;</span>';
         entry.context.textContent = "Sem dados";
     });
+}
+
+function clearInventarioMetrics() {
+    if (!inventarioMetricsDOM) {
+        inventarioMetricsDOM = collectInventarioMetricElements();
+    }
+
+    if (!inventarioMetricsDOM) {
+        return;
+    }
+
+    Object.values(inventarioMetricsDOM).forEach((entry) => {
+        if (!entry || !entry.value || !entry.context) {
+            return;
+        }
+        entry.card.dataset.tone = "empty";
+        entry.value.innerHTML = '<span class="metric-card__value-text">&mdash;</span>';
+        entry.context.textContent = "Sem dados";
+    });
+}
+
+function findInventarioExtremum(dataset, mode) {
+    if (!dataset) {
+        return null;
+    }
+
+    const values = Array.isArray(dataset.realizado) ? dataset.realizado : [];
+    const labels = Array.isArray(dataset.labels) ? dataset.labels : [];
+    const metas = Array.isArray(dataset.meta) ? dataset.meta : [];
+
+    let bestIndex = -1;
+    let bestValue = mode === "min" ? Infinity : -Infinity;
+
+    values.forEach((value, index) => {
+        if (typeof value !== "number" || !Number.isFinite(value)) {
+            return;
+        }
+
+        if (mode === "min") {
+            if (value < bestValue) {
+                bestValue = value;
+                bestIndex = index;
+            }
+        } else if (value > bestValue) {
+            bestValue = value;
+            bestIndex = index;
+        }
+    });
+
+    if (bestIndex === -1) {
+        return null;
+    }
+
+    const metaValue = metas[bestIndex];
+
+    return {
+        label: labels[bestIndex] !== undefined && labels[bestIndex] !== null ? String(labels[bestIndex]) : "",
+        value: bestValue,
+        meta: typeof metaValue === "number" && Number.isFinite(metaValue) ? metaValue : null,
+    };
+}
+
+function computeInventarioAverage(dataset) {
+    if (!dataset) {
+        return null;
+    }
+
+    const values = Array.isArray(dataset.realizado) ? dataset.realizado.filter((value) => Number.isFinite(value)) : [];
+    if (!values.length) {
+        return null;
+    }
+
+    const metas = Array.isArray(dataset.meta) ? dataset.meta.filter((value) => Number.isFinite(value)) : [];
+    const total = values.reduce((sum, current) => sum + current, 0);
+    const metaAverage = metas.length ? metas.reduce((sum, current) => sum + current, 0) / metas.length : null;
+
+    return {
+        average: total / values.length,
+        count: values.length,
+        metaAverage,
+    };
+}
+
+function computeInventarioWeeksOnTarget(dataset) {
+    if (!dataset) {
+        return null;
+    }
+
+    const valores = Array.isArray(dataset.realizado) ? dataset.realizado : [];
+    const metas = Array.isArray(dataset.meta) ? dataset.meta : [];
+
+    let total = 0;
+    let hits = 0;
+
+    valores.forEach((valor, index) => {
+        const metaValue = metas[index];
+        if (!Number.isFinite(valor) || !Number.isFinite(metaValue)) {
+            return;
+        }
+        total += 1;
+        if (valor >= metaValue - 0.0001) {
+            hits += 1;
+        }
+    });
+
+    if (total === 0) {
+        return null;
+    }
+
+    return {
+        hits,
+        total,
+        share: hits / total,
+    };
+}
+
+function computeInventarioDivergence(dataset) {
+    if (!dataset) {
+        return null;
+    }
+
+    const valores = Array.isArray(dataset.realizado) ? dataset.realizado : [];
+    const metas = Array.isArray(dataset.meta) ? dataset.meta : [];
+    const labels = Array.isArray(dataset.labels) ? dataset.labels : [];
+
+    let total = 0;
+    let sumDiff = 0;
+    let worstDiff = -Infinity;
+    let worstLabel = "";
+
+    valores.forEach((valor, index) => {
+        const metaValue = metas[index];
+        if (!Number.isFinite(valor) || !Number.isFinite(metaValue)) {
+            return;
+        }
+
+        const diff = Math.abs(valor - metaValue);
+        sumDiff += diff;
+        total += 1;
+
+        if (diff > worstDiff) {
+            worstDiff = diff;
+            worstLabel = labels[index] !== undefined && labels[index] !== null ? String(labels[index]) : "";
+        }
+    });
+
+    if (total === 0) {
+        return null;
+    }
+
+    return {
+        averageDiff: sumDiff / total,
+        worstDiff,
+        worstLabel,
+    };
+}
+
+function updateInventarioMetrics() {
+    if (!inventarioMetricsDOM) {
+        inventarioMetricsDOM = collectInventarioMetricElements();
+    }
+
+    if (!inventarioMetricsDOM) {
+        return;
+    }
+
+    const dataset = inventarioDatasetCache;
+    const realizedValues = Array.isArray(dataset?.realizado)
+        ? dataset.realizado.filter((value) => Number.isFinite(value))
+        : [];
+    const hasRealized = realizedValues.length > 0;
+    const hasMeta = Array.isArray(dataset?.meta) && dataset.meta.some((value) => Number.isFinite(value));
+
+    if (inventarioMetricsDOM.highestCoverage) {
+        const highest = hasRealized ? findInventarioExtremum(dataset, "max") : null;
+        const defaultTone = highest && typeof highest.meta === "number"
+            ? highest.value >= highest.meta
+                ? "good"
+                : "bad"
+            : "good";
+
+        updateMetricCard(inventarioMetricsDOM.highestCoverage, highest, {
+            defaultTone,
+            getArrow: (entry) => {
+                if (typeof entry.meta === "number") {
+                    const delta = entry.value - entry.meta;
+                    if (Math.abs(delta) <= 0.001) {
+                        return { char: "→", tone: "neutral" };
+                    }
+                    return delta > 0 ? { char: "↑", tone: "good" } : { char: "↓", tone: "bad" };
+                }
+                return { char: "↑", tone: "good" };
+            },
+            formatValue: (entry) => percentageFormatter.format((entry.value || 0) / 100),
+            formatContext: (entry) => {
+                const label = entry.label || "Sem rótulo";
+                if (typeof entry.meta === "number") {
+                    const delta = entry.value - entry.meta;
+                    const relation = delta >= 0 ? "acima" : "abaixo";
+                    const deltaText = percentageFormatter.format(Math.abs(delta) / 100);
+                    return `${label} · ${relation} da meta (${deltaText})`;
+                }
+                return label;
+            },
+            emptyContext: "Sem cobertura registrada",
+        });
+    }
+
+    if (inventarioMetricsDOM.lowestCoverage) {
+        const lowest = hasRealized ? findInventarioExtremum(dataset, "min") : null;
+        const defaultTone = lowest && typeof lowest.meta === "number"
+            ? lowest.value >= lowest.meta
+                ? "neutral"
+                : "bad"
+            : "bad";
+
+        updateMetricCard(inventarioMetricsDOM.lowestCoverage, lowest, {
+            defaultTone,
+            getArrow: (entry) => {
+                if (typeof entry.meta === "number") {
+                    const delta = entry.value - entry.meta;
+                    if (Math.abs(delta) <= 0.001) {
+                        return { char: "→", tone: "neutral" };
+                    }
+                    return delta > 0 ? { char: "↑", tone: "neutral" } : { char: "↓", tone: "bad" };
+                }
+                return { char: "↓", tone: "bad" };
+            },
+            formatValue: (entry) => percentageFormatter.format((entry.value || 0) / 100),
+            formatContext: (entry) => {
+                const label = entry.label || "Sem rótulo";
+                if (typeof entry.meta === "number") {
+                    const delta = entry.value - entry.meta;
+                    const relation = delta >= 0 ? "acima" : "abaixo";
+                    const deltaText = percentageFormatter.format(Math.abs(delta) / 100);
+                    return `${label} · ${relation} da meta (${deltaText})`;
+                }
+                return label;
+            },
+            emptyContext: "Sem cobertura registrada",
+        });
+    }
+
+    if (inventarioMetricsDOM.averageCoverage) {
+        const averageInfo = hasRealized ? computeInventarioAverage(dataset) : null;
+        const averageTone = averageInfo
+            ? typeof averageInfo.metaAverage === "number"
+                ? averageInfo.average >= averageInfo.metaAverage
+                    ? "good"
+                    : "bad"
+                : "neutral"
+            : "neutral";
+
+        updateMetricCard(inventarioMetricsDOM.averageCoverage, averageInfo, {
+            defaultTone: averageTone,
+            getArrow: (info) => {
+                if (!info || typeof info.metaAverage !== "number") {
+                    return null;
+                }
+                const delta = info.average - info.metaAverage;
+                if (Math.abs(delta) <= 0.001) {
+                    return { char: "→", tone: "neutral" };
+                }
+                return delta > 0 ? { char: "↑", tone: "good" } : { char: "↓", tone: "bad" };
+            },
+            formatValue: (info) => percentageFormatter.format((info?.average || 0) / 100),
+            formatContext: (info) => {
+                if (!info) {
+                    return "Sem dados";
+                }
+                if (typeof info.metaAverage === "number") {
+                    const delta = info.average - info.metaAverage;
+                    const deltaText = percentageFormatter.format(Math.abs(delta) / 100);
+                    const relation = delta >= 0 ? "acima" : "abaixo";
+                    return `Meta média ${percentageFormatter.format(info.metaAverage / 100)} · ${relation} ${deltaText}`;
+                }
+                return `${info.count} semanas analisadas`;
+            },
+            emptyContext: "Sem cobertura consolidada",
+        });
+    }
+
+    if (inventarioMetricsDOM.weeksOnTarget) {
+        const weeksInfo = hasRealized && hasMeta ? computeInventarioWeeksOnTarget(dataset) : null;
+        const targetTone = weeksInfo
+            ? weeksInfo.share >= 0.7
+                ? "good"
+                : weeksInfo.share >= 0.5
+                    ? "neutral"
+                    : "bad"
+            : "neutral";
+
+        updateMetricCard(inventarioMetricsDOM.weeksOnTarget, weeksInfo, {
+            defaultTone: targetTone,
+            formatValue: (info) => `${info.hits} / ${info.total}`,
+            formatContext: (info) => `Cobertura ≥ meta em ${percentageFormatter.format(info.share)}`,
+            emptyContext: hasMeta ? "Sem semanas avaliadas" : "Sem metas registradas",
+        });
+    }
+
+    if (inventarioMetricsDOM.divergenceIndex) {
+        const divergenceInfo = hasRealized && hasMeta ? computeInventarioDivergence(dataset) : null;
+        const divergenceTone = divergenceInfo
+            ? divergenceInfo.averageDiff <= 5
+                ? "good"
+                : divergenceInfo.averageDiff <= 10
+                    ? "neutral"
+                    : "bad"
+            : hasMeta
+                ? "neutral"
+                : "neutral";
+
+        updateMetricCard(inventarioMetricsDOM.divergenceIndex, divergenceInfo, {
+            defaultTone: divergenceTone,
+            formatValue: (info) => percentageFormatter.format((info.averageDiff || 0) / 100),
+            formatContext: (info) => {
+                if (!info) {
+                    return hasMeta ? "Sem divergências" : "Sem metas";
+                }
+                const worstLabel = info.worstLabel || "Sem rótulo";
+                const worstGap = percentageFormatter.format((info.worstDiff || 0) / 100);
+                return `Maior gap: ${worstLabel} (${worstGap})`;
+            },
+            emptyContext: hasMeta ? "Sem divergências calculadas" : "Sem metas registradas",
+        });
+    }
 }
 
 function findCorteExtremum(dataset, mode) {
@@ -2258,6 +3533,12 @@ function initSlideNavigation(panelAnimator) {
         if (targetId === "faturamento" && corteChartInstance) {
             requestAnimationFrame(() => {
                 corteChartInstance.resize();
+            });
+        }
+
+        if (targetId === "inventario" && inventarioChartInstance) {
+            requestAnimationFrame(() => {
+                inventarioChartInstance.resize();
             });
         }
 

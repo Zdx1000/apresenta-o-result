@@ -14,6 +14,8 @@ DATA_FILE = BASE_DIR / "Apresentação.xlsx"
 DATA_SHEET = "Bloqueado por Mês"
 DATA_SHEET_CORTE = "Corte"
 DATA_SHEET_CORTE_2 = "Corte-motivos"
+DATA_SHEET_INVENTARIO = "Inventario"
+DATA_SHEET_INVENTARIO_2 = "Inventario - Valores"
 
 
 def LoadData(file_path, sheet_name):
@@ -152,6 +154,50 @@ def load_corte_motivos_dataframe():
     return dataframe
 
 
+def load_inventario_dataframe():
+    dataframe = _load_sheet(DATA_SHEET_INVENTARIO)
+    if dataframe is None:
+        return None
+    dataframe = dataframe.copy()
+
+    try:
+        if "Realizado" in dataframe.columns:
+            dataframe["Realizado"] = dataframe["Realizado"].apply(convert_percentage)
+
+        if "Meta" in dataframe.columns:
+            dataframe["Meta"] = dataframe["Meta"].apply(convert_percentage)
+    except Exception as error:
+        print(f"An error occurred while processing the Inventario data: {error}")
+
+    return dataframe
+
+
+def load_inventario_valores_dataframe():
+    dataframe = _load_sheet(DATA_SHEET_INVENTARIO_2)
+    if dataframe is None:
+        return None
+    dataframe = dataframe.copy()
+
+    try:
+        valor_columns = {
+            "Estoque Contado Acumulado": converter_valor,
+            "11 Ajuste Inv. Falta": converter_valor,
+            "5 Ajuste Inv. Sobra": converter_valor,
+            "Valor Absoluto": converter_valor,
+            "Valor Modular": converter_valor,
+        }
+
+        for column_name, converter in valor_columns.items():
+            if column_name in dataframe.columns:
+                dataframe[column_name] = dataframe[column_name].apply(converter)
+
+        if "% Ajuste" in dataframe.columns:
+            dataframe["% Ajuste"] = dataframe["% Ajuste"].apply(convert_percentage)
+    except Exception as error:
+        print(f"An error occurred while processing the Inventario Valores data: {error}")
+    return dataframe
+
+
 def _coerce_value(value: Any):
     if isinstance(value, pd.Timestamp):
         return value.isoformat()
@@ -258,6 +304,19 @@ def get_corte_motivos():
         return jsonify({"error": "Dados indisponiveis"}), 500
 
     payload = _serialize_dataframe(dataframe)
+    return jsonify(payload)
+
+
+@app.route("/api/inventario", methods=["GET"])
+def get_inventario():
+    dataframe = load_inventario_dataframe()
+    if dataframe is None or dataframe.empty:
+        return jsonify({"error": "Dados indisponiveis"}), 500
+
+    payload = _serialize_dataframe(dataframe)
+    valores_dataframe = load_inventario_valores_dataframe()
+    if valores_dataframe is not None and not valores_dataframe.empty:
+        payload["valores"] = _serialize_dataframe(valores_dataframe)
     return jsonify(payload)
 
 

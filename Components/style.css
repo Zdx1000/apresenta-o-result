@@ -24,6 +24,8 @@
 	--filter-tab-bg-active: linear-gradient(150deg, rgba(230, 238, 248, 0.92), rgba(251, 253, 255, 0.82));
 	--filter-tab-color: rgba(31, 36, 48, 0.75);
 	--filter-tab-color-active: rgb(0, 42, 220);
+	--inventario-card-radius: 26px;
+	--inventario-chip-radius: 18px;
 	--color-bar-label-positive: #b42331;
 	--color-bar-label-negative: #0f5132;
 	--color-bar-label-neutral: #4f5d75;
@@ -884,6 +886,265 @@ body {
 	width: 100%;
 	height: clamp(360px, 48vh, 500px);
 	max-height: 500px;
+}
+
+#inventarioChart {
+	width: 100%;
+	height: clamp(320px, 45vh, 460px);
+	max-height: 460px;
+}
+
+.indice-chart-card {
+	gap: 18px;
+}
+
+.indice-chart-card__layout {
+	display: grid;
+	grid-template-columns: minmax(420px, 700px) minmax(0, 1fr);
+	gap: 58px;
+	align-items: stretch;
+}
+
+.indice-chart-card__layout--single {
+	grid-template-columns: minmax(0, 1fr);
+}
+
+.inventario-values-card {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	min-width: 0;
+	padding: 18px 30px;
+	border-radius: var(--inventario-card-radius);
+	background: transparent;
+	box-shadow: var(--filter-tab-shadow), 0 26px 64px -42px rgba(4, 34, 96, 0.52);
+	backdrop-filter: blur(12px);
+	isolation: isolate;
+}
+
+.inventario-values-card::before {
+	content: "";
+	position: absolute;
+	inset: 2px;
+	border-radius: calc(var(--inventario-card-radius) - 4px);
+	background: linear-gradient(135deg, rgba(255, 255, 255, 0.48) 0%, rgba(236, 242, 250, 0.26) 100%);
+	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.38);
+	opacity: 0.98;
+	z-index: 0;
+}
+
+.inventario-values-card[hidden] {
+	display: none;
+}
+
+.inventario-values-card__title,
+.inventario-values-card__section {
+	position: relative;
+	z-index: 1;
+}
+
+.inventario-values-card__title {
+	font-size: 0.96rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: rgba(31, 36, 48, 0.78);
+	text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.inventario-values-card__section {
+	display: grid;
+	gap: 18px;
+}
+
+.inventario-values-card__section--two {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.inventario-values-card__section--three {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.inventario-values-card__item {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 18px 20px;
+	border-radius: var(--inventario-chip-radius);
+	background: transparent;
+	box-shadow: var(--filter-tab-shadow);
+	cursor: default;
+	overflow: hidden;
+	isolation: isolate;
+	transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.inventario-values-card__item::before {
+	content: "";
+	position: absolute;
+	inset: 2px;
+	border-radius: calc(var(--inventario-chip-radius) - 4px);
+	background: var(--filter-tab-bg);
+	opacity: 0.96;
+	z-index: 0;
+	transition: background 0.25s ease, opacity 0.25s ease;
+}
+
+.inventario-values-card__item:hover::before,
+.inventario-values-card__item:focus-within::before {
+	background: var(--filter-tab-bg-active);
+	opacity: 1;
+}
+
+.inventario-values-card__item:hover,
+.inventario-values-card__item:focus-within {
+	box-shadow: var(--filter-tab-shadow), 0 0 0 1px rgba(0, 42, 220, 0.08);
+	transform: translateY(-1px);
+}
+
+.inventario-values-card__label {
+	position: relative;
+	z-index: 1;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 0.68rem;
+	font-weight: 600;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: rgba(31, 36, 48, 0.58);
+}
+
+.inventario-values-card__icon {
+	font-size: 1.1rem;
+	line-height: 1;
+	color: rgba(31, 36, 48, 0.7);
+	text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.inventario-values-card__value {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	justify-content: center;
+	align-items: baseline;
+	font-size: 1.12rem;
+	font-weight: 600;
+	color: var(--color-text-main);
+	text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
+	font-variant-numeric: tabular-nums;
+	word-break: break-word;
+	line-height: 1.18;
+	text-align: center;
+	width: 100%;
+}
+
+.inventario-values-card__item--ano .inventario-values-card__icon,
+.inventario-values-card__item--ano .inventario-values-card__label {
+	color: rgba(37, 99, 235, 0.72);
+}
+
+.inventario-values-card__item--unidade .inventario-values-card__icon,
+.inventario-values-card__item--unidade .inventario-values-card__label {
+	color: rgba(13, 148, 136, 0.72);
+}
+
+.inventario-values-card__item--estoque .inventario-values-card__icon,
+.inventario-values-card__item--estoque .inventario-values-card__label {
+	color: rgba(30, 64, 175, 0.74);
+}
+
+.inventario-values-card__item--falta .inventario-values-card__icon,
+.inventario-values-card__item--falta .inventario-values-card__label {
+	color: rgba(220, 38, 38, 0.72);
+}
+
+.inventario-values-card__item--sobra .inventario-values-card__icon,
+.inventario-values-card__item--sobra .inventario-values-card__label {
+	color: rgba(5, 150, 105, 0.72);
+}
+
+.inventario-values-card__item--valor-absoluto .inventario-values-card__icon,
+.inventario-values-card__item--valor-absoluto .inventario-values-card__label {
+	color: rgba(180, 83, 9, 0.74);
+}
+
+.inventario-values-card__item--valor-modular .inventario-values-card__icon,
+.inventario-values-card__item--valor-modular .inventario-values-card__label {
+	color: rgba(124, 58, 237, 0.74);
+}
+
+.inventario-values-card__item--percentual .inventario-values-card__icon,
+.inventario-values-card__item--percentual .inventario-values-card__label {
+	color: rgba(76, 29, 149, 0.76);
+}
+
+.indice-chart-card__body {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	justify-content: stretch;
+	min-height: clamp(320px, 45vh, 460px);
+}
+
+.indice-chart-card__chart {
+	position: relative;
+	flex: 1 1 auto;
+	width: 100%;
+	height: clamp(320px, 45vh, 460px);
+}
+
+.indice-chart-card__chart canvas {
+	width: 100% !important;
+	height: 100% !important;
+	display: block;
+}
+
+.indice-chart-card__chart.is-hidden {
+	display: none;
+}
+
+.indice-chart-card__empty {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	margin: 0;
+	padding: 12px 16px;
+	border-radius: 14px;
+	border: 1px solid rgba(15, 23, 42, 0.12);
+	background: rgba(255, 255, 255, 0.96);
+	color: rgba(15, 23, 42, 0.62);
+	font-weight: 600;
+	text-align: center;
+}
+
+@media (max-width: 1360px) {
+	.indice-chart-card__layout {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.inventario-values-card {
+		order: 2;
+	}
+
+	.indice-chart-card__body {
+		order: 1;
+	}
+
+	.inventario-values-card__section--two,
+	.inventario-values-card__section--three {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 960px) {
+	.inventario-values-card__section--two,
+	.inventario-values-card__section--three {
+		grid-template-columns: minmax(0, 1fr);
+	}
 }
 
 .status-message {
