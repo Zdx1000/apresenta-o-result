@@ -1,3 +1,5 @@
+import os
+import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -6,11 +8,39 @@ import pandas as pd
 from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 
-app = Flask(__name__, static_folder="Components", static_url_path="")
-CORS(app)
 
-BASE_DIR = Path(__file__).resolve().parent
-DATA_FILE = BASE_DIR / "Apresentação.xlsx"
+def _is_frozen() -> bool:
+    return getattr(sys, "frozen", False)
+
+
+def _get_resource_dir() -> Path:
+    if _is_frozen():
+        bundle_dir = getattr(sys, "_MEIPASS", None)
+        if bundle_dir:
+            return Path(bundle_dir)
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+def _get_data_dir() -> Path:
+    if _is_frozen():
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+def _get_data_file() -> Path:
+    override = os.environ.get("PAINEL_DADOS_PATH")
+    if override:
+        candidate = Path(override).expanduser()
+        if candidate.exists():
+            return candidate
+    return _get_data_dir() / "Apresentação.xlsx"
+
+
+BASE_DIR = _get_resource_dir()
+DATA_FILE = _get_data_file()
+app = Flask(__name__, static_folder=str(BASE_DIR / "Components"), static_url_path="")
+CORS(app)
 DATA_SHEET = "Bloqueado por Mês"
 DATA_SHEET_CORTE = "Corte"
 DATA_SHEET_CORTE_2 = "Corte-motivos"

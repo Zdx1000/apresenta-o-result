@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 import threading
@@ -9,6 +10,25 @@ from tkinter import messagebox
 import tkinter.ttk as ttk
 
 
+def _is_frozen() -> bool:
+    return getattr(sys, "frozen", False)
+
+
+def _get_resource_root() -> Path:
+    if _is_frozen():
+        bundle_dir = getattr(sys, "_MEIPASS", None)
+        if bundle_dir:
+            return Path(bundle_dir)
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+def _get_working_dir() -> Path:
+    if _is_frozen():
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
 class ServerController:
     def __init__(self, master: tk.Tk) -> None:
         self.master = master
@@ -16,6 +36,12 @@ class ServerController:
         self.master.geometry("420x460")
         self.master.resizable(False, False)
         self.master.configure(bg="#0f172a")
+
+        self._frozen = _is_frozen()
+        self._base_path = _get_resource_root()
+        self._working_dir = _get_working_dir()
+        self._icon_image = None
+        self._set_window_icon()
 
         self.style = ttk.Style(self.master)
         try:
@@ -45,7 +71,6 @@ class ServerController:
             foreground="#f8fafc",
             padding=8,
         )
-
         self.style.map(
             "Accent.TButton",
             background=[("!disabled", "#2563eb"), ("disabled", "#1e40af")],
@@ -57,11 +82,7 @@ class ServerController:
             foreground=[("disabled", "#f8d7da"), ("!disabled", "#f8fafc")],
         )
 
-        self._base_path = Path(__file__).resolve().parent
-        self._process: subprocess.Popen[str] | None = None
-        self._lock = threading.Lock()
-
-        self._status_var = tk.StringVar(value="Servidor parado")
+        self._status_var = tk.StringVar(value="Aguardando...")
         self._url_var = tk.StringVar(value="http://127.0.0.1:5000/")
         self._status_indicator = None
         self._status_dot_id = None
@@ -72,9 +93,28 @@ class ServerController:
             "error": "#ef4444",
             "stopped": "#64748b",
         }
+        self._process = None
+        self._lock = threading.Lock()
 
         self._build_ui()
         self.master.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _resolve_path(self, *relative: str) -> Path:
+        candidate = self._base_path.joinpath(*relative)
+        if candidate.exists():
+            return candidate
+        return self._working_dir.joinpath(*relative)
+
+    def _set_window_icon(self) -> None:
+        icon_path = self._resolve_path("favicon.ico")
+        if not icon_path.exists():
+            return
+        try:
+            icon_image = tk.PhotoImage(file=str(icon_path))
+            self.master.iconphoto(True, icon_image)
+            self._icon_image = icon_image
+        except tk.TclError:
+            pass
 
     def _build_ui(self) -> None:
         container = ttk.Frame(self.master, padding=(24, 20, 24, 24), style="Root.TFrame")
@@ -155,20 +195,33 @@ class ServerController:
                 messagebox.showinfo("Servidor", "O servidor já está em execução.")
                 return
 
-            python_executable = sys.executable
-            main_script = self._base_path / "main.py"
-            if not main_script.exists():
-                messagebox.showerror("Erro", f"main.py não encontrado em {self._base_path}")
-                return
+            if self._frozen:
+                command = [sys.executable, "--run-server"]
+            else:
+                main_script = self._resolve_path("main.py")
+                if not main_script.exists():
+                    messagebox.showerror("Erro", f"main.py não encontrado em {self._base_path}")
+                    return
+                command = [sys.executable, str(main_script)]
+
+            env = os.environ.copy()
+            env.setdefault("PYTHONUNBUFFERED", "1")
+            if self._frozen:
+                env.pop("FLASK_DEBUG", None)
+
+            popen_kwargs = {
+                "cwd": str(self._working_dir),
+                "stdout": subprocess.PIPE,
+                "stderr": subprocess.PIPE,
+                "text": True,
+                "env": env,
+            }
+
+            if self._frozen and os.name == "nt":
+                popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
             try:
-                self._process = subprocess.Popen(
-                    [python_executable, str(main_script)],
-                    cwd=str(self._base_path),
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                )
+                self._process = subprocess.Popen(command, **popen_kwargs)
             except OSError as error:
                 messagebox.showerror("Erro", f"Não foi possível iniciar o servidor: {error}")
                 self._set_status("Erro ao iniciar", "error")
@@ -239,7 +292,18 @@ class ServerController:
             self._status_indicator.itemconfig(self._status_dot_id, fill=color)
 
 
+def _run_server_mode() -> None:
+    os.chdir(str(_get_resource_root()))
+    from main import app
+
+    app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
+
+
 def main() -> None:
+    if "--run-server" in sys.argv:
+        _run_server_mode()
+        return
+
     root = tk.Tk()
     ServerController(root)
     root.mainloop()
