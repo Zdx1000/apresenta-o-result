@@ -99,13 +99,31 @@ body {
 
 
 .dashboard__filters-actions {
+	--filters-visible-count: 5;
+	--filters-tab-min-width: 168px;
+	--filters-gap: 14px;
+	--filters-visible-width: calc(var(--filters-tab-min-width) * var(--filters-visible-count) + var(--filters-gap) * (var(--filters-visible-count) - 1));
+	--filters-tab-width: max(
+		var(--filters-tab-min-width),
+		calc((100% - (var(--filters-visible-count) - 1) * var(--filters-gap)) / var(--filters-visible-count))
+	);
 	display: inline-flex;
 	align-items: center;
-	gap: 14px;
+	gap: var(--filters-gap);
 	padding: 6px 10px;
 	border-radius: 999px;
 	background: linear-gradient(135deg, rgba(255, 255, 255, 0.46) 0%, rgba(236, 242, 250, 0.24) 100%);
 	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.38);
+	width: 100%;
+	max-width: none;
+	overflow-x: auto;
+	overflow-y: hidden;
+	-ms-overflow-style: none;
+	scrollbar-width: none;
+}
+
+.dashboard__filters-actions::-webkit-scrollbar {
+	display: none;
 }
 
 .dashboard__tab {
@@ -116,7 +134,9 @@ body {
 	align-items: center;
 	justify-content: center;
 	gap: 10px;
-	min-width: 168px;
+	flex: 0 0 var(--filters-tab-width, var(--filters-tab-min-width, auto));
+	min-width: var(--filters-tab-min-width, 168px);
+	max-width: var(--filters-tab-width, 100%);
 	min-height: 48px;
 	padding: 0 26px;
 	border-radius: var(--filter-tab-border-radius);
@@ -546,6 +566,9 @@ body {
 	appearance: none;
 	border: none;
 	padding: 8px 16px;
+	flex: 0 0 var(--filters-tab-width, var(--filters-tab-min-width, auto));
+	min-width: var(--filters-tab-min-width, 168px);
+	max-width: var(--filters-tab-width, 100%);
 	border-radius: 999px;
 	font-size: 13px;
 	font-weight: 600;

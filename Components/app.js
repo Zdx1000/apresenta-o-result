@@ -3559,9 +3559,25 @@ function initSlideNavigation(panelAnimator) {
 
     const slides = Array.from(slidesContainer.querySelectorAll("[data-slide-id]"));
     const tabs = Array.from(document.querySelectorAll("[data-slide-target]"));
+    const tabContainer = document.querySelector(".dashboard__filters-actions");
 
     if (!slides.length || !tabs.length) {
         return;
+    }
+
+    if (tabContainer) {
+        tabContainer.addEventListener(
+            "wheel",
+            (event) => {
+                if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
+                    return;
+                }
+
+                tabContainer.scrollLeft += event.deltaY;
+                event.preventDefault();
+            },
+            { passive: false }
+        );
     }
 
     let activeId =
@@ -3576,6 +3592,12 @@ function initSlideNavigation(panelAnimator) {
             tab.classList.toggle("is-active", isActive);
             tab.setAttribute("aria-selected", isActive ? "true" : "false");
             tab.setAttribute("tabindex", isActive ? "0" : "-1");
+
+            if (isActive && tabContainer) {
+                requestAnimationFrame(() =>
+                    tab.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" })
+                );
+            }
         });
     };
 
