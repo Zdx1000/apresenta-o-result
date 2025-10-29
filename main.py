@@ -47,6 +47,8 @@ DATA_SHEET_CORTE_2 = "Corte-motivos"
 DATA_SHEET_INVENTARIO = "Inventario"
 DATA_SHEET_INVENTARIO_2 = "Inventario - Valores"
 DATA_SHEET_FUNNEL = "Funnel"
+DATA_SHEET_SENHA_167 = "Senha 167"
+DATA_SHEET_SENHA_171 = "Senha 171"
 
 
 def LoadData(file_path, sheet_name):
@@ -244,6 +246,25 @@ def load_funnel_dataframe():
     except Exception as error:
         print(f"An error occurred while processing the Funnel data: {error}")
 
+    return dataframe
+
+def load_senha_167_dataframe():
+    dataframe = _load_sheet(DATA_SHEET_SENHA_167)
+    if dataframe is None:
+        return None
+    dataframe = dataframe.copy()
+
+    print(dataframe.head())
+
+    return dataframe
+
+def load_senha_171_dataframe():
+    dataframe = _load_sheet(DATA_SHEET_SENHA_171)
+    if dataframe is None:
+        return None
+    dataframe = dataframe.copy()
+
+    print(dataframe.head())
     return dataframe
 
 
