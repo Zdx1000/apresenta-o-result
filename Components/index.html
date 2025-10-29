@@ -47,15 +47,18 @@
 			<section class="dashboard__panel dashboard__panel--slide panel--animate is-active" id="slide-bloqueado" data-slide-id="bloqueado">
 				<header class="panel__header">
 					<div class="panel__titles">
-						<h1 class="panel__title">R$ Bloq. no ESTOQUE</h1>
-						<p class="panel__subtitle">Valores apresentados por início e fim de cada mês</p>
+						<h1 class="panel__title" data-bloqueado-title>R$ Bloq. no ESTOQUE</h1>
+						<p class="panel__subtitle" data-bloqueado-subtitle>Valores apresentados por início e fim de cada mês</p>
 					</div>
 					<div class="panel__actions">
-						<button type="button" class="panel__toggle" data-bloqueado-toggle>Bloqueado do Estoque TOP 10</button>
+						<button type="button" class="panel__toggle" data-bloqueado-toggle>
+							<span class="panel__toggle-label" data-toggle-label>Bloqueado do Estoque TOP 10</span>
+							<span class="panel__toggle-icon material-symbols-rounded" aria-hidden="true">arrow_forward</span>
+						</button>
 					</div>
 				</header>
-				<div class="bloqueado-views" data-bloqueado-views>
-					<section class="chart-card bloqueado-view bloqueado-view--primary" data-bloqueado-primary>
+				<div class="bloqueado-views panel-views" data-bloqueado-views>
+					<section class="chart-card panel-view panel-view--primary" data-bloqueado-primary>
 					<div class="chart-card__metrics">
 						<article class="metric-card metric-card--bad" data-metric="largest-positive">
 							<div class="metric-card__header">
@@ -129,11 +132,42 @@
 						<canvas id="bloqueadoChart" role="img" aria-label="Gráfico combinado de valores bloqueados e variação percentual"></canvas>
 					</div>
 					</section>
-					<section class="chart-card chart-card--placeholder bloqueado-view bloqueado-view--top10" data-bloqueado-top10 aria-hidden="true">
-					<div class="chart-card__placeholder">
-						<h2 class="chart-card__placeholder-title">Em breve</h2>
-						<p class="chart-card__placeholder-text">Esta seção apresentará o Bloqueado do Estoque TOP 10 em uma próxima atualização.</p>
-					</div>
+					<section class="chart-card panel-view panel-view--secondary bloqueado-top10-view" data-bloqueado-top10 aria-hidden="true" aria-live="polite">
+						<div class="bloqueado-top10-view__layout">
+							<div class="inventario-values-card bloqueado-top10-card" id="bloqueado-top10-card" aria-live="polite" aria-label="Bloqueado do Estoque TOP 10">
+								<h2 class="inventario-values-card__title">Bloqueado do Estoque TOP 10</h2>
+								<p class="bloqueado-top10-card__subtitle">Itens com maior valor bloqueado, incluindo quantidade e motivo.</p>
+								<p class="status-message" data-status="bloqueado-top10">Carregando dados...</p>
+								<div class="bloqueado-top10-card__list-wrapper" role="region" aria-live="polite" aria-label="Itens bloqueados com maior valor">
+									<ol class="bloqueado-top10-card__list" data-bloqueado-top10-list>
+										<li class="bloqueado-top10-card__empty">Sem dados disponíveis</li>
+									</ol>
+								</div>
+							</div>
+							<aside class="bloqueado-top10-card__insights" aria-label="Indicadores do Top 10">
+								<h3 class="bloqueado-top10-card__insights-title">Indicadores chave</h3>
+								<div class="bloqueado-top10-card__insights-grid">
+									<article class="bloqueado-top10-card__insight" data-top10-insight="total-value">
+										<span class="material-symbols-rounded bloqueado-top10-card__insight-icon" aria-hidden="true">payments</span>
+										<h4 class="bloqueado-top10-card__insight-label">Valor acumulado TOP 10</h4>
+										<p class="bloqueado-top10-card__insight-value" data-top10-insight-value="total-value">&mdash;</p>
+										<p class="bloqueado-top10-card__insight-caption">Somatório dos valores bloqueados.</p>
+									</article>
+									<article class="bloqueado-top10-card__insight" data-top10-insight="total-quantity">
+										<span class="material-symbols-rounded bloqueado-top10-card__insight-icon" aria-hidden="true">inventory_2</span>
+										<h4 class="bloqueado-top10-card__insight-label">Qtd. total bloqueada</h4>
+										<p class="bloqueado-top10-card__insight-value" data-top10-insight-value="total-quantity">&mdash;</p>
+										<p class="bloqueado-top10-card__insight-caption">Volume somado dos itens afetados.</p>
+									</article>
+									<article class="bloqueado-top10-card__insight" data-top10-insight="top3-share">
+										<span class="material-symbols-rounded bloqueado-top10-card__insight-icon" aria-hidden="true">stacked_bar_chart</span>
+										<h4 class="bloqueado-top10-card__insight-label">Participação TOP 3</h4>
+										<p class="bloqueado-top10-card__insight-value" data-top10-insight-value="top3-share">&mdash;</p>
+										<p class="bloqueado-top10-card__insight-caption">Percentual do valor concentrado nos três primeiros.</p>
+									</article>
+								</div>
+							</aside>
+						</div>
 					</section>
 				</div>
 			</section>
@@ -143,8 +177,15 @@
 						<h1 class="panel__title" id="panel-faturamento-title">Corte por Faturamento</h1>
 						<p class="panel__subtitle">Distribuição de cortes planejada para a próxima etapa</p>
 					</div>
+					<div class="panel__actions">
+						<button type="button" class="panel__toggle" data-corte-toggle>
+							<span class="panel__toggle-label" data-toggle-label>Corte Setores</span>
+							<span class="panel__toggle-icon material-symbols-rounded" aria-hidden="true">arrow_forward</span>
+						</button>
+					</div>
 				</header>
-				<section class="chart-card chart-card--split" aria-live="polite">
+				<div class="panel-views corte-views" data-corte-views>
+					<section class="chart-card chart-card--split panel-view panel-view--primary" aria-live="polite" data-corte-primary>
 					<div class="chart-card__metrics chart-card__metrics--corte">
 						<article class="metric-card metric-card--neutral" data-corte-metric="highest">
 							<div class="metric-card__header">
@@ -246,7 +287,14 @@
 							<canvas id="corteChart" role="img" aria-label="Percentual de corte por faturamento por mês"></canvas>
 						</div>
 					</div>
-				</section>
+					</section>
+					<section class="chart-card chart-card--placeholder panel-view panel-view--secondary" data-corte-setores aria-hidden="true" aria-live="polite">
+						<div class="chart-card__placeholder">
+							<h2 class="chart-card__placeholder-title">Em breve</h2>
+							<p class="chart-card__placeholder-text">Esta seção apresentará o Corte Setores em uma próxima atualização.</p>
+						</div>
+					</section>
+				</div>
 			</section>
 			<section class="dashboard__panel dashboard__panel--slide panel--animate" id="slide-inventario" data-slide-id="inventario" aria-labelledby="panel-inventario-title">
 				<header class="panel__header">
@@ -254,8 +302,15 @@
 						<h1 class="panel__title" id="panel-inventario-title">Inventário Rotativo</h1>
 						<p class="panel__subtitle">Cobertura semanal de inventários e divergências encontradas</p>
 					</div>
+					<div class="panel__actions">
+						<button type="button" class="panel__toggle" data-inventario-toggle>
+							<span class="panel__toggle-label" data-toggle-label>Inventário cancelados</span>
+							<span class="panel__toggle-icon material-symbols-rounded" aria-hidden="true">arrow_forward</span>
+						</button>
+					</div>
 				</header>
-				<section class="chart-card indice-chart-card" aria-live="polite" id="inventario-chart-card">
+				<div class="panel-views inventario-views" data-inventario-views>
+				<section class="chart-card indice-chart-card panel-view panel-view--primary" aria-live="polite" id="inventario-chart-card" data-inventario-primary>
 					<div class="chart-card__metrics chart-card__metrics--corte chart-card__metrics--inventario">
 						<article class="metric-card metric-card--good" data-inventario-metric="highest-coverage">
 							<div class="metric-card__header">
@@ -399,6 +454,13 @@
 						</div>
 					</div>
 				</section>
+				<section class="chart-card chart-card--placeholder panel-view panel-view--secondary" data-inventario-cancelados aria-hidden="true" aria-live="polite">
+					<div class="chart-card__placeholder">
+						<h2 class="chart-card__placeholder-title">Em breve</h2>
+						<p class="chart-card__placeholder-text">Esta seção apresentará o Inventário cancelados em uma próxima atualização.</p>
+					</div>
+				</section>
+				</div>
 			</section>
 			<section class="dashboard__panel dashboard__panel--slide panel--animate" id="slide-avaria" data-slide-id="avaria" aria-labelledby="panel-avaria-title">
 				<header class="panel__header">

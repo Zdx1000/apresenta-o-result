@@ -15,6 +15,11 @@ const percentageFormatter = new Intl.NumberFormat("pt-BR", {
     minimumFractionDigits: 2,
 });
 
+const decimalFormatter = new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+});
+
 let bloqueadoChartInstance = null;
 let corteChartInstance = null;
 let inventarioChartInstance = null;
@@ -27,6 +32,8 @@ let inventarioDatasetCache = null;
 let inventarioValoresDOM = null;
 let inventarioMetricsDOM = null;
 let bloqueadoDatasetCache = null;
+let bloqueadoTop10List = null;
+let bloqueadoTop10Insights = null;
 
 const MOTIVO_KEY_CANDIDATES = ["Motivos", "Motivo", "Descrição", "Descricao", "Categoria"];
 const VALOR_KEY_CANDIDATES = ["Soma de Valor Total", "Valor Total", "Total", "Valor", "Soma"];
@@ -42,6 +49,12 @@ const INVENTARIO_VALORES_AJUSTE_SOBRA_CANDIDATES = ["5 Ajuste Inv. Sobra", "Ajus
 const INVENTARIO_VALORES_ABSOLUTO_CANDIDATES = ["Valor Absoluto"];
 const INVENTARIO_VALORES_MODULAR_CANDIDATES = ["Valor Modular"];
 const INVENTARIO_VALORES_PERCENT_CANDIDATES = ["% Ajuste", "Percentual Ajuste"];
+
+const BLOQUEADO_TOP10_ITEM_CANDIDATES = ["Item"];
+const BLOQUEADO_TOP10_DESCRIPTION_CANDIDATES = ["Descrição", "Descricao", "Item Descricao"];
+const BLOQUEADO_TOP10_QUANTITY_CANDIDATES = ["Qtd. Bloq. Estoque", "Quantidade", "Qtd"];
+const BLOQUEADO_TOP10_VALUE_CANDIDATES = ["Valor Bloquado", "Valor Bloqueado", "Valor"];
+const BLOQUEADO_TOP10_REASON_CANDIDATES = ["Motivo do Bloqueio", "Motivo", "Justificativa"];
 
 const normalizeKeyName = (key) => {
     if (typeof key !== "string") {
@@ -144,10 +157,13 @@ const normalizeMotivosRows = (rows) => {
 
 document.addEventListener("DOMContentLoaded", () => {
     const bloqueadoStatusElement = document.querySelector('[data-status="bloqueado"]');
+    const bloqueadoTop10StatusElement = document.querySelector('[data-status="bloqueado-top10"]');
     const corteStatusElement = document.querySelector('[data-status="corte"]');
     const corteMotivosStatusElement = document.querySelector('[data-status="corte-motivos"]');
     const inventarioStatusElement = document.querySelector('[data-status="inventario"]');
     motivosTableBody = document.querySelector("[data-motivos-body]");
+    bloqueadoTop10List = document.querySelector("[data-bloqueado-top10-list]");
+    bloqueadoTop10Insights = collectBloqueadoTop10Insights();
     metricsDOM = collectMetricElements();
     corteMetricsDOM = collectCorteMetricElements();
     inventarioMetricsDOM = collectInventarioMetricElements();
@@ -159,8 +175,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const panelAnimator = initPanelScrollAnimation();
     initSlideNavigation(panelAnimator);
     initBloqueadoTopToggle();
+    initCorteSetoresToggle();
+    initInventarioCanceladosToggle();
 
     loadBloqueadoDataset(bloqueadoStatusElement);
+    loadBloqueadoTop10Dataset(bloqueadoTop10StatusElement);
     loadCorteDataset(corteStatusElement);
     loadCorteMotivosDataset(corteMotivosStatusElement);
     loadInventarioDataset(inventarioStatusElement);
@@ -197,42 +216,467 @@ function loadBloqueadoDataset(statusElement) {
         });
 }
 
-function initBloqueadoTopToggle() {
-    const toggleButton = document.querySelector("[data-bloqueado-toggle]");
-    const viewsContainer = document.querySelector("[data-bloqueado-views]");
-    const primarySection = document.querySelector("[data-bloqueado-primary]");
-    const top10Section = document.querySelector("[data-bloqueado-top10]");
+function loadBloqueadoTop10Dataset(statusElement) {
+    fetch("/api/bloqueado/top10")
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error("Falha ao carregar os dados do bloqueado top 10");
+            }
+            return response.json();
+        })
+        .then((payload) => {
+            const entries = normalizeBloqueadoTop10Rows(payload);
+            renderBloqueadoTop10List(entries);
 
-    if (!toggleButton || !viewsContainer || !primarySection || !top10Section) {
+            if (statusElement) {
+                if (entries.length) {
+                    statusElement.textContent = "";
+                    statusElement.classList.add("status-message--hidden");
+                } else {
+                    statusElement.textContent = "Sem dados disponiveis no momento.";
+                    statusElement.classList.remove("status-message--hidden");
+                }
+            }
+        })
+        .catch((error) => {
+            console.error(error);
+            renderBloqueadoTop10List([]);
+            if (statusElement) {
+                statusElement.textContent = "Nao foi possivel carregar os dados.";
+                statusElement.classList.remove("status-message--hidden");
+            }
+        });
+}
+
+function normalizeBloqueadoTop10Rows(payload) {
+    const columns = Array.isArray(payload?.columns) ? payload.columns : [];
+    const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+
+    if (!columns.length || !rows.length) {
+        return [];
+    }
+
+    const columnRefs = {
+        item: findColumnByCandidates(columns, BLOQUEADO_TOP10_ITEM_CANDIDATES),
+        description: findColumnByCandidates(columns, BLOQUEADO_TOP10_DESCRIPTION_CANDIDATES),
+        quantity: findColumnByCandidates(columns, BLOQUEADO_TOP10_QUANTITY_CANDIDATES),
+        value: findColumnByCandidates(columns, BLOQUEADO_TOP10_VALUE_CANDIDATES),
+        reason: findColumnByCandidates(columns, BLOQUEADO_TOP10_REASON_CANDIDATES),
+    };
+
+    const extractText = (row, columnName) => {
+        if (!columnName || !(columnName in row)) {
+            return "";
+        }
+        const value = row[columnName];
+        return value === null || value === undefined ? "" : String(value).trim();
+    };
+
+    const entries = rows.map((row) => {
+        const quantityValue = columnRefs.quantity ? parseNumericValue(row?.[columnRefs.quantity]) : null;
+        const amountValue = columnRefs.value ? parseNumericValue(row?.[columnRefs.value]) : null;
+
+        return {
+            item: extractText(row, columnRefs.item),
+            description: extractText(row, columnRefs.description),
+            quantity: Number.isFinite(quantityValue) ? quantityValue : null,
+            value: Number.isFinite(amountValue) ? amountValue : null,
+            reason: extractText(row, columnRefs.reason),
+        };
+    });
+
+    const filtered = entries.filter((entry) => {
+        return (
+            entry.item ||
+            entry.description ||
+            Number.isFinite(entry.quantity) ||
+            Number.isFinite(entry.value) ||
+            entry.reason
+        );
+    });
+
+    filtered.sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+
+    return filtered.slice(0, 10);
+}
+
+function renderBloqueadoTop10List(entries) {
+    if (!bloqueadoTop10List) {
+        renderBloqueadoTop10Insights(Array.isArray(entries) ? entries : []);
         return;
     }
 
-    let showingTop10 = false;
+    const safeEntries = Array.isArray(entries) ? entries : [];
+    bloqueadoTop10List.innerHTML = "";
+
+    if (!safeEntries.length) {
+        const emptyItem = document.createElement("li");
+        emptyItem.className = "bloqueado-top10-card__empty";
+        emptyItem.textContent = "Sem dados disponiveis";
+        bloqueadoTop10List.appendChild(emptyItem);
+        renderBloqueadoTop10Insights([]);
+        return;
+    }
+
+    const createMetric = (label, value, modifier, iconName) => {
+        const metric = document.createElement("div");
+        metric.className = "bloqueado-top10-card__metric" + (modifier ? ` bloqueado-top10-card__metric--${modifier}` : "");
+
+        const metricHeader = document.createElement("span");
+        metricHeader.className = "bloqueado-top10-card__metric-header";
+
+        const metricIcon = document.createElement("span");
+        metricIcon.className = "material-symbols-rounded bloqueado-top10-card__metric-icon";
+        metricIcon.textContent = iconName || "bar_chart";
+        metricIcon.setAttribute("aria-hidden", "true");
+
+        const metricLabel = document.createElement("span");
+        metricLabel.className = "bloqueado-top10-card__metric-label";
+        metricLabel.textContent = label;
+
+        metricHeader.append(metricIcon, metricLabel);
+
+        const metricValue = document.createElement("span");
+        metricValue.className = "bloqueado-top10-card__metric-value";
+        metricValue.textContent = value;
+
+        metric.append(metricHeader, metricValue);
+        return metric;
+    };
+
+    const getRankIcon = (position) => {
+        if (position === 1) {
+            return "workspace_premium";
+        }
+        if (position === 2) {
+            return "emoji_events";
+        }
+        if (position === 3) {
+            return "military_tech";
+        }
+        return "format_list_numbered";
+    };
+
+    safeEntries.forEach((entry, index) => {
+        const rank = index + 1;
+        const quantityText = Number.isFinite(entry.quantity) ? decimalFormatter.format(entry.quantity) : "—";
+        const valueText = Number.isFinite(entry.value) ? currencyFormatter.format(entry.value) : "—";
+
+        const itemElement = document.createElement("li");
+        itemElement.className = "bloqueado-top10-card__item funnel-summary__item";
+        itemElement.dataset.rank = String(rank);
+        itemElement.setAttribute(
+            "aria-label",
+            `Top ${String(rank).padStart(2, "0")} - ${entry.item || entry.description || "Sem identificacao"}`
+        );
+
+        const main = document.createElement("div");
+        main.className = "bloqueado-top10-card__item-main";
+
+        const badge = document.createElement("span");
+        badge.className = "bloqueado-top10-card__badge";
+        badge.setAttribute("aria-hidden", "true");
+
+        const badgeIcon = document.createElement("span");
+        badgeIcon.className = "material-symbols-rounded bloqueado-top10-card__badge-icon";
+        badgeIcon.textContent = getRankIcon(rank);
+
+        const badgeLabel = document.createElement("span");
+        badgeLabel.className = "bloqueado-top10-card__badge-label";
+        badgeLabel.textContent = `Top ${String(rank).padStart(2, "0")}`;
+
+        badge.append(badgeIcon, badgeLabel);
+
+        const info = document.createElement("div");
+        info.className = "bloqueado-top10-card__info";
+
+        const itemHeader = document.createElement("div");
+        itemHeader.className = "bloqueado-top10-card__item-header";
+
+        const itemIcon = document.createElement("span");
+        itemIcon.className = "material-symbols-rounded bloqueado-top10-card__item-icon";
+        itemIcon.textContent = "inventory";
+        itemIcon.setAttribute("aria-hidden", "true");
+
+        const itemCode = document.createElement("span");
+        itemCode.className = "bloqueado-top10-card__item-code";
+        itemCode.textContent = entry.item || "—";
+        if (entry.item) {
+            itemCode.title = entry.item;
+        }
+
+        itemHeader.append(itemIcon, itemCode);
+
+        const description = document.createElement("p");
+        description.className = "bloqueado-top10-card__description";
+        description.textContent = entry.description || "Descricao nao informada";
+        if (entry.description) {
+            description.title = entry.description;
+        }
+
+        info.append(itemHeader, description);
+
+        const metrics = document.createElement("div");
+        metrics.className = "bloqueado-top10-card__metrics";
+        metrics.append(
+            createMetric("Qtd. bloqueada", quantityText, "quantity", "inventory_2"),
+            createMetric("Valor bloqueado", valueText, "value", "payments")
+        );
+
+        main.append(badge, info, metrics);
+
+        const reasonWrapper = document.createElement("p");
+        reasonWrapper.className = "bloqueado-top10-card__reason";
+
+        const reasonLabel = document.createElement("span");
+        reasonLabel.className = "bloqueado-top10-card__reason-label";
+
+        const reasonIcon = document.createElement("span");
+        reasonIcon.className = "material-symbols-rounded bloqueado-top10-card__reason-icon";
+        reasonIcon.textContent = "flag";
+        reasonIcon.setAttribute("aria-hidden", "true");
+
+        const reasonLabelText = document.createElement("span");
+        reasonLabelText.textContent = "Motivo";
+
+        reasonLabel.append(reasonIcon, reasonLabelText);
+
+        const reasonText = document.createElement("span");
+        reasonText.className = "bloqueado-top10-card__reason-text";
+        reasonText.textContent = entry.reason || "Nao informado";
+        if (entry.reason) {
+            reasonText.title = entry.reason;
+        }
+
+        reasonWrapper.append(reasonLabel, reasonText);
+
+        itemElement.append(main, reasonWrapper);
+
+        bloqueadoTop10List.appendChild(itemElement);
+    });
+
+    renderBloqueadoTop10Insights(safeEntries);
+}
+
+function renderBloqueadoTop10Insights(entries) {
+    if (!bloqueadoTop10Insights) {
+        return;
+    }
+
+    const insightKeys = Object.keys(bloqueadoTop10Insights);
+    if (!insightKeys.length) {
+        return;
+    }
+
+    const safeEntries = Array.isArray(entries) ? entries : [];
+
+    const setInsightValue = (key, value) => {
+        const element = bloqueadoTop10Insights?.[key];
+        if (element) {
+            element.textContent = value;
+        }
+    };
+
+    if (!safeEntries.length) {
+        setInsightValue("total-value", "—");
+        setInsightValue("total-quantity", "—");
+        setInsightValue("top3-share", "—");
+        return;
+    }
+
+    const totalValue = safeEntries.reduce((sum, entry) => {
+        return sum + (Number.isFinite(entry.value) ? entry.value : 0);
+    }, 0);
+
+    const totalQuantity = safeEntries.reduce((sum, entry) => {
+        return sum + (Number.isFinite(entry.quantity) ? entry.quantity : 0);
+    }, 0);
+
+    const top3Value = safeEntries.slice(0, 3).reduce((sum, entry) => {
+        return sum + (Number.isFinite(entry.value) ? entry.value : 0);
+    }, 0);
+
+    const hasValueData = safeEntries.some((entry) => Number.isFinite(entry.value));
+    const hasQuantityData = safeEntries.some((entry) => Number.isFinite(entry.quantity));
+    const top3Share = hasValueData && totalValue > 0 ? top3Value / totalValue : null;
+
+    setInsightValue("total-value", hasValueData ? currencyFormatter.format(totalValue) : "—");
+    setInsightValue(
+        "total-quantity",
+        hasQuantityData ? decimalFormatter.format(totalQuantity) : "—"
+    );
+    setInsightValue(
+        "top3-share",
+        Number.isFinite(top3Share) ? percentageFormatter.format(top3Share) : "—"
+    );
+}
+
+function collectBloqueadoTop10Insights() {
+    const elements = document.querySelectorAll("[data-top10-insight-value]");
+    if (!elements.length) {
+        return {};
+    }
+
+    return Array.from(elements).reduce((accumulator, element) => {
+        const key = element.getAttribute("data-top10-insight-value");
+        if (key) {
+            accumulator[key] = element;
+        }
+        return accumulator;
+    }, {});
+}
+
+function initPanelSlideToggle({
+    toggleSelector,
+    primarySelector,
+    secondarySelector,
+    showSecondaryLabel,
+    showPrimaryLabel,
+    headingSelector,
+    primaryHeading,
+    secondaryHeading,
+    subtitleSelector,
+    primarySubtitle,
+    secondarySubtitle,
+}) {
+    const toggleButton = document.querySelector(toggleSelector);
+    const primarySection = document.querySelector(primarySelector);
+    const secondarySection = document.querySelector(secondarySelector);
+    const headingElement = headingSelector ? document.querySelector(headingSelector) : null;
+    const subtitleElement = subtitleSelector ? document.querySelector(subtitleSelector) : null;
+    const labelElement = toggleButton?.querySelector?.("[data-toggle-label]") ?? null;
+
+    if (!toggleButton || !primarySection || !secondarySection) {
+        return;
+    }
+
+    let showingSecondary = false;
+
+    const initialHeading = headingElement ? headingElement.textContent.trim() : null;
+    const initialSubtitle = subtitleElement ? subtitleElement.textContent.trim() : null;
+    const fallbackLabel = !labelElement ? toggleButton.textContent.trim() : null;
+    const hasIconElement = Boolean(toggleButton?.querySelector?.(".panel__toggle-icon"));
+
+    const setButtonLabel = (value) => {
+        if (labelElement) {
+            labelElement.textContent = value;
+        } else if (typeof value === "string") {
+            toggleButton.textContent = value;
+        }
+    };
+
+    if (!labelElement && fallbackLabel && !showSecondaryLabel) {
+        showSecondaryLabel = fallbackLabel;
+    }
 
     const applyState = () => {
-        viewsContainer.classList.toggle("is-top10", showingTop10);
-
-        if (showingTop10) {
+        if (showingSecondary) {
+            primarySection.style.transform = "translateX(-100%)";
+            primarySection.style.opacity = "0";
+            primarySection.style.pointerEvents = "none";
             primarySection.setAttribute("aria-hidden", "true");
-            top10Section.setAttribute("aria-hidden", "false");
-            toggleButton.textContent = "R$ Bloq. no ESTOQUE";
+
+            secondarySection.style.transform = "translateX(-100%)";
+            secondarySection.style.opacity = "1";
+            secondarySection.style.pointerEvents = "auto";
+            secondarySection.removeAttribute("aria-hidden");
+
+            setButtonLabel(showPrimaryLabel);
             toggleButton.setAttribute("aria-pressed", "true");
             toggleButton.setAttribute("aria-expanded", "true");
+
+            if (headingElement) {
+                headingElement.textContent = secondaryHeading ?? primaryHeading ?? initialHeading ?? "";
+            }
+
+            if (subtitleElement) {
+                subtitleElement.textContent = secondarySubtitle ?? primarySubtitle ?? initialSubtitle ?? "";
+            }
         } else {
+            primarySection.style.transform = "translateX(0%)";
+            primarySection.style.opacity = "1";
+            primarySection.style.pointerEvents = "auto";
             primarySection.removeAttribute("aria-hidden");
-            top10Section.setAttribute("aria-hidden", "true");
-            toggleButton.textContent = "Bloqueado do Estoque TOP 10";
+
+            secondarySection.style.transform = "translateX(0%)";
+            secondarySection.style.opacity = "0";
+            secondarySection.style.pointerEvents = "none";
+            secondarySection.setAttribute("aria-hidden", "true");
+
+            setButtonLabel(showSecondaryLabel ?? fallbackLabel ?? "");
             toggleButton.setAttribute("aria-pressed", "false");
             toggleButton.setAttribute("aria-expanded", "false");
+
+            if (headingElement) {
+                headingElement.textContent = primaryHeading ?? initialHeading ?? "";
+            }
+
+            if (subtitleElement) {
+                subtitleElement.textContent = primarySubtitle ?? initialSubtitle ?? "";
+            }
+        }
+
+        if (hasIconElement) {
+            toggleButton.classList.toggle("panel__toggle--reverse", showingSecondary);
         }
     };
 
     toggleButton.addEventListener("click", () => {
-        showingTop10 = !showingTop10;
+        showingSecondary = !showingSecondary;
         applyState();
     });
 
+    secondarySection.style.transform = "translateX(0%)";
+    secondarySection.style.opacity = "0";
+    secondarySection.style.pointerEvents = "none";
+    secondarySection.setAttribute("aria-hidden", "true");
+
+    primarySection.style.transform = "translateX(0%)";
+    primarySection.style.opacity = "1";
+    primarySection.style.pointerEvents = "auto";
+    primarySection.removeAttribute("aria-hidden");
+
+    if (showSecondaryLabel) {
+        setButtonLabel(showSecondaryLabel);
+    }
+
     applyState();
+}
+
+function initBloqueadoTopToggle() {
+    initPanelSlideToggle({
+        toggleSelector: "[data-bloqueado-toggle]",
+        primarySelector: "[data-bloqueado-primary]",
+        secondarySelector: "[data-bloqueado-top10]",
+        showSecondaryLabel: "Bloqueado do Estoque TOP 10",
+        showPrimaryLabel: "R$ Bloq. no ESTOQUE",
+        headingSelector: "[data-bloqueado-title]",
+        primaryHeading: "R$ Bloq. no ESTOQUE",
+        secondaryHeading: "Bloqueado de Estoque",
+        subtitleSelector: "[data-bloqueado-subtitle]",
+        primarySubtitle: "Valores apresentados por início e fim de cada mês",
+        secondarySubtitle: "Bloqueado de Estoque os TOP 10 itens com maior valor bloqueados",
+    });
+}
+
+function initCorteSetoresToggle() {
+    initPanelSlideToggle({
+        toggleSelector: "[data-corte-toggle]",
+        primarySelector: "[data-corte-primary]",
+        secondarySelector: "[data-corte-setores]",
+        showSecondaryLabel: "Corte Setores",
+        showPrimaryLabel: "Corte por Faturamento",
+    });
+}
+
+function initInventarioCanceladosToggle() {
+    initPanelSlideToggle({
+        toggleSelector: "[data-inventario-toggle]",
+        primarySelector: "[data-inventario-primary]",
+        secondarySelector: "[data-inventario-cancelados]",
+        showSecondaryLabel: "Inventário cancelados",
+        showPrimaryLabel: "Inventário Rotativo",
+    });
 }
 
 function loadCorteDataset(statusElement) {
