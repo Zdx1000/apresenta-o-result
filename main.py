@@ -42,8 +42,11 @@ DATA_FILE = _get_data_file()
 app = Flask(__name__, static_folder=str(BASE_DIR / "Components"), static_url_path="")
 CORS(app)
 DATA_SHEET = "Bloqueado por Mês"
+DATA_SHEET_BLOQ10 = "Bloqueado-top10"
 DATA_SHEET_CORTE = "Corte"
 DATA_SHEET_CORTE_2 = "Corte-motivos"
+DATA_SHEET_CORTE_SETORES = "Corte-setores"
+DATA_SHEET_CORTE_TOP10 = "Corte-top10"
 DATA_SHEET_INVENTARIO = "Inventario"
 DATA_SHEET_INVENTARIO_2 = "Inventario - Valores"
 DATA_SHEET_FUNNEL = "Funnel"
@@ -187,6 +190,72 @@ def load_corte_motivos_dataframe():
     return dataframe
 
 
+def load_corte_setores_dataframe():
+    dataframe = _load_sheet(DATA_SHEET_CORTE_SETORES)
+    if dataframe is None:
+        return None
+    dataframe = dataframe.copy()
+
+    try:
+        if "Setor" in dataframe.columns:
+            dataframe["Setor"] = dataframe["Setor"].astype(str)
+
+        if "Soma de Valor Total" in dataframe.columns:
+            dataframe["Soma de Valor Total"] = dataframe["Soma de Valor Total"].apply(converter_valor)
+    except Exception as error:
+        print(f"An error occurred while processing the Corte Setores data: {error}")
+
+    return dataframe
+
+
+def load_corte_top10_dataframe():
+    dataframe = _load_sheet(DATA_SHEET_CORTE_TOP10)
+    if dataframe is None:
+        return None
+    dataframe = dataframe.copy()
+
+    try:
+        if "Itens" in dataframe.columns:
+            dataframe["Itens"] = dataframe["Itens"].astype(str)
+
+        if "Soma de Valor Total Corte/Pedido" in dataframe.columns:
+            dataframe["Soma de Valor Total Corte/Pedido"] = dataframe["Soma de Valor Total Corte/Pedido"].apply(converter_valor)
+
+        if "Soma de Qtde" in dataframe.columns:
+            dataframe["Soma de Qtde"] = dataframe["Soma de Qtde"].apply(converter_valor)
+    except Exception as error:
+        print(f"An error occurred while processing the Corte Top10 data: {error}")
+
+    return dataframe
+
+
+def load_bloqueado_top10_dataframe():
+    dataframe = _load_sheet(DATA_SHEET_BLOQ10)
+    if dataframe is None:
+        return None
+    dataframe = dataframe.copy()
+
+    try:
+        if "Item" in dataframe.columns:
+            dataframe["Item"] = dataframe["Item"].astype(str)
+
+        if "Descrição" in dataframe.columns:
+            dataframe["Descrição"] = dataframe["Descrição"].astype(str)
+
+        if "Qtd. Bloq. Estoque" in dataframe.columns:
+            dataframe["Qtd. Bloq. Estoque"] = dataframe["Qtd. Bloq. Estoque"].apply(converter_valor)
+
+        if "Valor Bloquado" in dataframe.columns:
+            dataframe["Valor Bloquado"] = dataframe["Valor Bloquado"].apply(converter_valor)
+
+        if "Motivo do Bloqueio" in dataframe.columns:
+            dataframe["Motivo do Bloqueio"] = dataframe["Motivo do Bloqueio"].astype(str)
+    except Exception as error:
+        print(f"An error occurred while processing the Bloqueado Top10 data: {error}")
+
+    return dataframe
+
+
 def load_inventario_dataframe():
     dataframe = _load_sheet(DATA_SHEET_INVENTARIO)
     if dataframe is None:
@@ -248,24 +317,19 @@ def load_funnel_dataframe():
 
     return dataframe
 
+
 def load_senha_167_dataframe():
     dataframe = _load_sheet(DATA_SHEET_SENHA_167)
     if dataframe is None:
         return None
-    dataframe = dataframe.copy()
+    return dataframe.copy()
 
-    print(dataframe.head())
-
-    return dataframe
 
 def load_senha_171_dataframe():
     dataframe = _load_sheet(DATA_SHEET_SENHA_171)
     if dataframe is None:
         return None
-    dataframe = dataframe.copy()
-
-    print(dataframe.head())
-    return dataframe
+    return dataframe.copy()
 
 
 def _coerce_value(value: Any):
@@ -367,6 +431,36 @@ def get_corte():
     return jsonify(payload)
 
 
+@app.route("/api/corte/setores", methods=["GET"])
+def get_corte_setores():
+    dataframe = load_corte_setores_dataframe()
+    if dataframe is None or dataframe.empty:
+        return jsonify({"error": "Dados indisponiveis"}), 500
+
+    payload = _serialize_dataframe(dataframe)
+    return jsonify(payload)
+
+
+@app.route("/api/corte/top10", methods=["GET"])
+def get_corte_top10():
+    dataframe = load_corte_top10_dataframe()
+    if dataframe is None or dataframe.empty:
+        return jsonify({"error": "Dados indisponiveis"}), 500
+
+    payload = _serialize_dataframe(dataframe)
+    return jsonify(payload)
+
+
+@app.route("/api/bloqueado/top10", methods=["GET"])
+def get_bloqueado_top10():
+    dataframe = load_bloqueado_top10_dataframe()
+    if dataframe is None or dataframe.empty:
+        return jsonify({"error": "Dados indisponiveis"}), 500
+
+    payload = _serialize_dataframe(dataframe)
+    return jsonify(payload)
+
+
 @app.route("/api/corte/motivos", methods=["GET"])
 def get_corte_motivos():
     dataframe = load_corte_motivos_dataframe()
@@ -457,6 +551,26 @@ def get_funnel():
         "entries": entries,
     }
 
+    return jsonify(payload)
+
+
+@app.route("/api/senha/167", methods=["GET"])
+def get_senha_167():
+    dataframe = load_senha_167_dataframe()
+    if dataframe is None or dataframe.empty:
+        return jsonify({"error": "Dados indisponiveis"}), 500
+
+    payload = _serialize_dataframe(dataframe)
+    return jsonify(payload)
+
+
+@app.route("/api/senha/171", methods=["GET"])
+def get_senha_171():
+    dataframe = load_senha_171_dataframe()
+    if dataframe is None or dataframe.empty:
+        return jsonify({"error": "Dados indisponiveis"}), 500
+
+    payload = _serialize_dataframe(dataframe)
     return jsonify(payload)
 
 

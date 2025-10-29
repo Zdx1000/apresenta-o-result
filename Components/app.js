@@ -158,6 +158,7 @@ document.addEventListener("DOMContentLoaded", () => {
     resetInventarioValoresCard();
     const panelAnimator = initPanelScrollAnimation();
     initSlideNavigation(panelAnimator);
+    initBloqueadoTopToggle();
 
     loadBloqueadoDataset(bloqueadoStatusElement);
     loadCorteDataset(corteStatusElement);
@@ -194,6 +195,44 @@ function loadBloqueadoDataset(statusElement) {
                 statusElement.classList.remove("status-message--hidden");
             }
         });
+}
+
+function initBloqueadoTopToggle() {
+    const toggleButton = document.querySelector("[data-bloqueado-toggle]");
+    const viewsContainer = document.querySelector("[data-bloqueado-views]");
+    const primarySection = document.querySelector("[data-bloqueado-primary]");
+    const top10Section = document.querySelector("[data-bloqueado-top10]");
+
+    if (!toggleButton || !viewsContainer || !primarySection || !top10Section) {
+        return;
+    }
+
+    let showingTop10 = false;
+
+    const applyState = () => {
+        viewsContainer.classList.toggle("is-top10", showingTop10);
+
+        if (showingTop10) {
+            primarySection.setAttribute("aria-hidden", "true");
+            top10Section.setAttribute("aria-hidden", "false");
+            toggleButton.textContent = "R$ Bloq. no ESTOQUE";
+            toggleButton.setAttribute("aria-pressed", "true");
+            toggleButton.setAttribute("aria-expanded", "true");
+        } else {
+            primarySection.removeAttribute("aria-hidden");
+            top10Section.setAttribute("aria-hidden", "true");
+            toggleButton.textContent = "Bloqueado do Estoque TOP 10";
+            toggleButton.setAttribute("aria-pressed", "false");
+            toggleButton.setAttribute("aria-expanded", "false");
+        }
+    };
+
+    toggleButton.addEventListener("click", () => {
+        showingTop10 = !showingTop10;
+        applyState();
+    });
+
+    applyState();
 }
 
 function loadCorteDataset(statusElement) {

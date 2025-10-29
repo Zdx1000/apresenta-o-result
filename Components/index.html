@@ -50,8 +50,12 @@
 						<h1 class="panel__title">R$ Bloq. no ESTOQUE</h1>
 						<p class="panel__subtitle">Valores apresentados por início e fim de cada mês</p>
 					</div>
+					<div class="panel__actions">
+						<button type="button" class="panel__toggle" data-bloqueado-toggle>Bloqueado do Estoque TOP 10</button>
+					</div>
 				</header>
-				<section class="chart-card">
+				<div class="bloqueado-views" data-bloqueado-views>
+					<section class="chart-card bloqueado-view bloqueado-view--primary" data-bloqueado-primary>
 					<div class="chart-card__metrics">
 						<article class="metric-card metric-card--bad" data-metric="largest-positive">
 							<div class="metric-card__header">
@@ -124,7 +128,14 @@
 					<div class="chart-card__canvas">
 						<canvas id="bloqueadoChart" role="img" aria-label="Gráfico combinado de valores bloqueados e variação percentual"></canvas>
 					</div>
-				</section>
+					</section>
+					<section class="chart-card chart-card--placeholder bloqueado-view bloqueado-view--top10" data-bloqueado-top10 aria-hidden="true">
+					<div class="chart-card__placeholder">
+						<h2 class="chart-card__placeholder-title">Em breve</h2>
+						<p class="chart-card__placeholder-text">Esta seção apresentará o Bloqueado do Estoque TOP 10 em uma próxima atualização.</p>
+					</div>
+					</section>
+				</div>
 			</section>
 			<section class="dashboard__panel dashboard__panel--slide panel--animate" id="slide-faturamento" data-slide-id="faturamento" aria-labelledby="panel-faturamento-title">
 				<header class="panel__header">

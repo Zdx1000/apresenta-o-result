@@ -47,6 +47,36 @@ body {
 	height: 100%;
 }
 
+.bloqueado-views {
+	position: relative;
+	display: flex;
+	width: 100%;
+	overflow: hidden;
+}
+.bloqueado-view {
+	flex: 0 0 100%;
+	min-width: 100%;
+	transition: transform 0.45s ease, opacity 0.45s ease;
+	will-change: transform, opacity;
+}
+.bloqueado-view--primary {
+	transform: translateX(0%);
+}
+.bloqueado-view--top10 {
+	transform: translateX(100%);
+	opacity: 0;
+	pointer-events: none;
+}
+.bloqueado-views.is-top10 .bloqueado-view--primary {
+	transform: translateX(-100%);
+	opacity: 0;
+	pointer-events: none;
+}
+.bloqueado-views.is-top10 .bloqueado-view--top10 {
+	transform: translateX(0%);
+	opacity: 1;
+	pointer-events: auto;
+}
 body {
 	font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 	background-color: var(--color-background);
@@ -522,6 +552,8 @@ body {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
+	gap: 18px;
+	flex-wrap: wrap;
 	padding: 28px 40px 20px;
 	margin-bottom: 18px;
 	background: linear-gradient(rgba(209, 46, 46, 0) 0%, rgba(255, 255, 255, 0.377) 100%);
@@ -529,6 +561,44 @@ body {
 	backdrop-filter: blur(6px);
 	border-bottom: 1px solid rgba(0, 31, 84, 0.12);
 	box-shadow: 0 20px 60px -48px var(--color-card-shadow);
+}
+
+.panel__actions {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.panel__toggle {
+	appearance: none;
+	border: none;
+	border-radius: 999px;
+	padding: 10px 22px;
+	font-size: 13px;
+	font-weight: 600;
+	letter-spacing: 0.32px;
+	text-transform: uppercase;
+	color: rgba(31, 36, 48, 0.86);
+	background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(218, 230, 245, 0.72));
+	box-shadow: 0 10px 24px -16px rgba(0, 31, 84, 0.45);
+	border: 1px solid rgba(0, 31, 84, 0.12);
+	cursor: pointer;
+	transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.panel__toggle:hover {
+	transform: translateY(-1px);
+	box-shadow: 0 16px 32px -18px rgba(0, 31, 84, 0.5);
+}
+
+.panel__toggle:focus {
+	outline: none;
+	box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.25);
+}
+
+.panel__toggle:active {
+	transform: translateY(0);
+	box-shadow: 0 8px 20px -14px rgba(0, 31, 84, 0.45);
 }
 
 .dashboard__filters {
@@ -1575,6 +1645,16 @@ body {
 
 	.panel__header {
 		padding: 24px 28px 16px;
+	}
+
+	.panel__actions {
+		width: 100%;
+		justify-content: flex-start;
+	}
+
+	.panel__toggle {
+		width: 100%;
+		justify-content: center;
 	}
 
 	.chart-card {
