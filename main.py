@@ -56,6 +56,9 @@ DATA_SHEET_SENHA_167 = "Senha 167"
 DATA_SHEET_SENHA_171 = "Senha 171"
 DATA_SHEET_AVARIA_SETORES = "Avaria - Setores"
 DATA_SHEET_AVARIA_ITENS = "Avaria - Itens"
+DATA_SHEET_AVARIA_MOTIVOS = "Avaria - Motivos"
+DATA_SHEET_AVARIA_DIRECIONADOS = "Avaria - Direcionados"
+DATA_SHEET_AVARIA_TURNOS = "Avaria - Turnos"
 
 def LoadData(file_path, sheet_name):
     try:
@@ -400,6 +403,69 @@ def load_avaria_itens_dataframe():
             dataframe["Quantidade"] = dataframe["Quantidade"].apply(convert_integer)
     except Exception as error:
         print(f"An error occurred while processing the Avaria Itens data: {error}")
+
+    return dataframe
+
+
+def load_avaria_motivos_dataframe():
+    dataframe = _load_sheet(DATA_SHEET_AVARIA_MOTIVOS)
+    if dataframe is None:
+        return None
+    dataframe = dataframe.copy()
+
+    try:
+        if "Motivos" in dataframe.columns:
+            dataframe["Motivos"] = dataframe["Motivos"].astype(str)
+
+        if "Valor Avariado" in dataframe.columns:
+            dataframe["Valor Avariado"] = dataframe["Valor Avariado"].apply(converter_valor)
+
+        if "Contagem de UNID." in dataframe.columns:
+            dataframe["Contagem de UNID."] = dataframe["Contagem de UNID."].apply(convert_integer)
+    except Exception as error:
+        print(f"An error occurred while processing the Avaria Motivos data: {error}")
+
+    return dataframe
+
+
+def load_avaria_direcionados_dataframe():
+    dataframe = _load_sheet(DATA_SHEET_AVARIA_DIRECIONADOS)
+    if dataframe is None:
+        return None
+    dataframe = dataframe.copy()
+
+    try:
+        if "Direcionados" in dataframe.columns:
+            dataframe["Direcionados"] = dataframe["Direcionados"].astype(str)
+
+        if "Avariado" in dataframe.columns:
+            dataframe["Avariado"] = dataframe["Avariado"].apply(converter_valor)
+
+        if "Recuperado" in dataframe.columns:
+            dataframe["Recuperado"] = dataframe["Recuperado"].apply(converter_valor)
+    except Exception as error:
+        print(f"An error occurred while processing the Avaria Direcionados data: {error}")
+
+    return dataframe
+
+
+def load_avaria_turnos_dataframe():
+    dataframe = _load_sheet(DATA_SHEET_AVARIA_TURNOS)
+    if dataframe is None:
+        return None
+    dataframe = dataframe.copy()
+
+    try:
+        if "Setores" in dataframe.columns:
+            dataframe["Setores"] = dataframe["Setores"].astype(str)
+
+        if "Valor Avariado" in dataframe.columns:
+            dataframe["Valor Avariado"] = dataframe["Valor Avariado"].apply(converter_valor)
+
+        if "Quantidade" in dataframe.columns:
+            dataframe["Quantidade"] = dataframe["Quantidade"].apply(convert_integer)
+    except Exception as error:
+        print(f"An error occurred while processing the Avaria Turnos data: {error}")
 
     return dataframe
 
