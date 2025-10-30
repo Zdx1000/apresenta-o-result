@@ -33,6 +33,12 @@ let corteDatasetCache = null;
 let corteMotivosSummary = [];
 let corteSetoresDatasetCache = null;
 let corteTop10TableBody = null;
+let corteTop10Dataset = [];
+let corteTop10Mode = "value";
+let corteTop10Toggle = null;
+let corteTop10HeaderLabel = null;
+let corteTop10HeaderIcon = null;
+let corteTop10StatusDOM = null;
 let inventarioDatasetCache = null;
 let inventarioValoresDOM = null;
 let inventarioMetricsDOM = null;
@@ -66,12 +72,14 @@ const CORTE_TOP10_ITEM_CANDIDATES = ["Itens", "Item", "Código", "Codigo", "SKU"
 const CORTE_TOP10_DESCRIPTION_CANDIDATES = ["Descrição", "Descricao", "Item Descrição", "Item Descricao", "Produto"];
 const CORTE_TOP10_VALUE_CANDIDATES = [
     "Soma de Valor Total Corte/Pedido",
+    "Soma de Valor Total Corte / Pedido",
     "Soma de Valor Total",
     "Valor Total",
     "Valor",
     "Soma",
 ];
 const CORTE_TOP10_QUANTITY_CANDIDATES = ["Soma de Qtde", "Quantidade", "Qtd", "Qtde"];
+const CORTE_TOP10_PRIMARY_VALUE_KEY = "Soma de Valor Total Corte/Pedido";
 
 const normalizeKeyName = (key) => {
     if (typeof key !== "string") {
@@ -80,6 +88,7 @@ const normalizeKeyName = (key) => {
     return key
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[\/\\-]+/g, " ")
         .replace(/\s+/g, " ")
         .trim()
         .toLowerCase();
@@ -178,16 +187,25 @@ document.addEventListener("DOMContentLoaded", () => {
     const corteStatusElement = document.querySelector('[data-status="corte"]');
     const corteMotivosStatusElement = document.querySelector('[data-status="corte-motivos"]');
     const corteSetoresStatusElement = document.querySelector('[data-status="corte-setores"]');
-    const corteTop10StatusElement = document.querySelector('[data-status="corte-top10"]');
+    corteTop10StatusDOM = document.querySelector('[data-status="corte-top10"]');
     const inventarioStatusElement = document.querySelector('[data-status="inventario"]');
     motivosTableBody = document.querySelector("[data-motivos-body]");
     corteTop10TableBody = document.querySelector("[data-corte-top10-body]");
+    corteTop10Toggle = document.querySelector('[data-corte-top10-toggle]');
+    corteTop10HeaderLabel = document.querySelector('[data-corte-top10-header]');
+    corteTop10HeaderIcon = document.querySelector('[data-corte-top10-header-icon]');
     bloqueadoTop10List = document.querySelector("[data-bloqueado-top10-list]");
     bloqueadoTop10Insights = collectBloqueadoTop10Insights();
     metricsDOM = collectMetricElements();
     corteMetricsDOM = collectCorteMetricElements();
     inventarioMetricsDOM = collectInventarioMetricElements();
     inventarioValoresDOM = collectInventarioValoresElements();
+
+    if (corteTop10Toggle) {
+        corteTop10Toggle.addEventListener('change', handleCorteTop10ToggleChange);
+        updateCorteTop10ToggleAria();
+    }
+    updateCorteTop10ColumnHeader();
     clearMetrics();
     clearCorteMetrics();
     clearInventarioMetrics();
@@ -203,7 +221,7 @@ document.addEventListener("DOMContentLoaded", () => {
     loadCorteDataset(corteStatusElement);
     loadCorteMotivosDataset(corteMotivosStatusElement);
     loadCorteSetoresDataset(corteSetoresStatusElement);
-    loadCorteTop10Dataset(corteTop10StatusElement);
+    loadCorteTop10Dataset(corteTop10StatusDOM);
     loadInventarioDataset(inventarioStatusElement);
 });
 
@@ -817,25 +835,20 @@ function loadCorteTop10Dataset(statusElement) {
             return response.json();
         })
         .then((payload) => {
-            const summary = normalizeCorteTop10Rows(payload?.rows);
-            populateCorteTop10Table(summary);
-
+            corteTop10Dataset = normalizeCorteTop10Rows(payload);
             if (statusElement) {
-                if (summary.length) {
-                    statusElement.textContent = "";
-                    statusElement.classList.add("status-message--hidden");
-                } else {
-                    statusElement.textContent = "Sem dados disponíveis.";
-                    statusElement.classList.remove("status-message--hidden");
-                }
+                statusElement.dataset.corteTop10State = "ready";
             }
+            refreshCorteTop10Table();
         })
         .catch((error) => {
             console.error(error);
-            populateCorteTop10Table([]);
+            corteTop10Dataset = [];
+            populateCorteTop10Table([], corteTop10Mode);
             if (statusElement) {
                 statusElement.textContent = "Nao foi possivel carregar os dados.";
                 statusElement.classList.remove("status-message--hidden");
+                statusElement.dataset.corteTop10State = "error";
             }
         });
 }
@@ -870,6 +883,8 @@ function renderCorteSetoresChart(rows) {
         corteSetoresChartInstance = null;
     }
 
+    removeExistingTooltip(canvasElement);
+
     if (!Array.isArray(rows) || !rows.length) {
         const context = canvasElement.getContext("2d");
         if (context) {
@@ -883,6 +898,7 @@ function renderCorteSetoresChart(rows) {
     const topEntries = rows.slice(0, 12);
     const labels = topEntries.map((entry) => entry.label || "Sem setor");
     const values = topEntries.map((entry) => (Number.isFinite(entry.value) ? entry.value : 0));
+    const totalValue = values.reduce((sum, current) => (Number.isFinite(current) ? sum + current : sum), 0);
 
     const styles = getComputedStyle(document.documentElement);
     const axisColor = styles.getPropertyValue("--color-axis").trim() || "#7d8597";
@@ -915,6 +931,63 @@ function renderCorteSetoresChart(rows) {
     ];
     const highlightLabelColor = "rgba(0, 31, 84, 0.92)";
     const neutralLabelColor = "rgba(31, 36, 48, 0.66)";
+
+    const toneClassMap = {
+        good: "good",
+        bad: "bad",
+        neutral: "neutral",
+    };
+
+    const createTooltipEntry = (label, value, options = {}) => ({
+        label,
+        value,
+        arrow: options.arrow || "",
+        arrowTone: options.arrowTone || "neutral",
+        valueTone: options.valueTone || "neutral",
+        emphasize: Boolean(options.emphasize),
+        muted: Boolean(options.muted),
+        icon: options.icon || null,
+    });
+
+    const tooltipIcons = {
+        value:
+            '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19h14"></path><path d="M8 19V11"></path><path d="M12 19V7"></path><path d="M16 19V13"></path></svg>',
+        percent:
+            '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 17.5l11-11"></path><circle cx="8.5" cy="8.5" r="2.5"></circle><circle cx="15.5" cy="15.5" r="2.5"></circle></svg>',
+    };
+
+    const getEntriesForBar = (index) => {
+        const value = Number.isFinite(values[index]) ? values[index] : 0;
+        const share = totalValue > 0 ? value / totalValue : null;
+        const entries = [
+            createTooltipEntry("Valor cortado", currencyFormatter.format(value), {
+                emphasize: true,
+                icon: "value",
+            }),
+        ];
+
+        if (share !== null && Number.isFinite(share)) {
+            entries.push(
+                createTooltipEntry("Participação", percentageFormatter.format(share), {
+                    icon: "percent",
+                })
+            );
+        }
+
+        entries.push(
+            createTooltipEntry("Posição", `#${index + 1}`, {
+                muted: true,
+            })
+        );
+
+        return entries;
+    };
+
+    const tooltipHelpers = {
+        getEntriesForBar,
+        toneClassMap,
+        icons: tooltipIcons,
+    };
 
     const highlightCount = Math.min(5, labels.length);
 
@@ -1041,35 +1114,8 @@ function renderCorteSetoresChart(rows) {
                     display: false,
                 },
                 tooltip: {
-                    callbacks: {
-                        label(context) {
-                            const value = Number.isFinite(context.parsed?.x) ? context.parsed.x : 0;
-                            const label = context.dataset?.label || "Valor cortado";
-                            return `${label}: ${currencyFormatter.format(value)}`;
-                        },
-                        labelColor(context) {
-                            const index = context.dataIndex;
-                            if (index < highlightCount) {
-                                const paletteIndex = Math.min(index, highlightBorderPalette.length - 1);
-                                const borderColor = highlightBorderPalette[paletteIndex];
-                                return {
-                                    borderColor,
-                                    backgroundColor: borderColor,
-                                    borderWidth: 2,
-                                    borderDash: [],
-                                };
-                            }
-                            return {
-                                borderColor: neutralBorderColor,
-                                backgroundColor: neutralBorderColor,
-                                borderWidth: 2,
-                                borderDash: [],
-                            };
-                        },
-                        labelTextColor(context) {
-                            return context.dataIndex < highlightCount ? highlightLabelColor : textMain;
-                        },
-                    },
+                    enabled: false,
+                    external: (context) => externalTooltipHandler(context, tooltipHelpers),
                 },
             },
             layout: {
@@ -1120,13 +1166,34 @@ function renderCorteSetoresChart(rows) {
     });
 }
 
-function normalizeCorteTop10Rows(rows) {
+function normalizeCorteTop10Rows(payload) {
+    const columns = Array.isArray(payload?.columns) ? payload.columns : [];
+    const rows = Array.isArray(payload?.rows) ? payload.rows : [];
     const safeRows = Array.isArray(rows) ? rows : [];
+
+    const uniqueValueCandidates = Array.from(
+        new Set([CORTE_TOP10_PRIMARY_VALUE_KEY, ...CORTE_TOP10_VALUE_CANDIDATES])
+    );
+
+    const columnRefs = {
+        item: findColumnByCandidates(columns, CORTE_TOP10_ITEM_CANDIDATES),
+        description: findColumnByCandidates(columns, CORTE_TOP10_DESCRIPTION_CANDIDATES),
+        value: findColumnByCandidates(columns, uniqueValueCandidates),
+        quantity: findColumnByCandidates(columns, CORTE_TOP10_QUANTITY_CANDIDATES),
+    };
+
     const mapped = safeRows.map((row) => {
-        const itemValue = extractValueFromRow(row, CORTE_TOP10_ITEM_CANDIDATES);
-        const descriptionValue = extractValueFromRow(row, CORTE_TOP10_DESCRIPTION_CANDIDATES);
-        const totalValue = extractValueFromRow(row, CORTE_TOP10_VALUE_CANDIDATES);
-        const quantityValue = extractValueFromRow(row, CORTE_TOP10_QUANTITY_CANDIDATES);
+        const itemValue = columnRefs.item && row ? row[columnRefs.item] : extractValueFromRow(row, CORTE_TOP10_ITEM_CANDIDATES);
+        const descriptionValue =
+            columnRefs.description && row
+                ? row[columnRefs.description]
+                : extractValueFromRow(row, CORTE_TOP10_DESCRIPTION_CANDIDATES);
+        const totalValue = columnRefs.value && row ? row[columnRefs.value] : extractValueFromRow(row, uniqueValueCandidates);
+        const quantityValue =
+            columnRefs.quantity && row
+                ? row[columnRefs.quantity]
+                : extractValueFromRow(row, CORTE_TOP10_QUANTITY_CANDIDATES);
+
         const numericTotal = parseNumericValue(totalValue);
         const numericQuantity = parseNumericValue(quantityValue);
 
@@ -1140,12 +1207,16 @@ function normalizeCorteTop10Rows(rows) {
         };
     });
 
-    const filtered = mapped.filter((entry) => entry.item || Number.isFinite(entry.value));
-    filtered.sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
-    return filtered.slice(0, 10);
+    return mapped.filter(
+        (entry) =>
+            entry.item ||
+            entry.description ||
+            Number.isFinite(entry.value) ||
+            Number.isFinite(entry.quantity)
+    );
 }
 
-function populateCorteTop10Table(entries) {
+function populateCorteTop10Table(entries, mode = "value") {
     if (!corteTop10TableBody) {
         return;
     }
@@ -1195,7 +1266,18 @@ function populateCorteTop10Table(entries) {
 
         const valorCell = document.createElement("td");
         valorCell.className = "corte-top10-table__cell corte-top10-table__cell--valor";
-        if (Number.isFinite(entry.value)) {
+        if (mode === "quantity") {
+            if (Number.isFinite(entry.quantity)) {
+                valorCell.textContent = decimalFormatter.format(entry.quantity);
+                if (Number.isFinite(entry.value)) {
+                    valorCell.title = `${decimalFormatter.format(entry.quantity)} unidades · ${currencyFormatter.format(entry.value)}`;
+                }
+            } else if (entry.rawQuantity !== null && entry.rawQuantity !== undefined && entry.rawQuantity !== "") {
+                valorCell.textContent = String(entry.rawQuantity);
+            } else {
+                valorCell.textContent = "—";
+            }
+        } else if (Number.isFinite(entry.value)) {
             valorCell.textContent = currencyFormatter.format(entry.value);
             if (Number.isFinite(entry.quantity)) {
                 valorCell.title = `${currencyFormatter.format(entry.value)} · ${decimalFormatter.format(entry.quantity)} unidades`;
@@ -1210,6 +1292,107 @@ function populateCorteTop10Table(entries) {
         tableRow.appendChild(valorCell);
         corteTop10TableBody.appendChild(tableRow);
     });
+}
+
+function getCorteTop10EntriesForMode(mode) {
+    const safeMode = mode === "quantity" ? "quantity" : "value";
+    const source = Array.isArray(corteTop10Dataset) ? corteTop10Dataset : [];
+
+    if (!source.length) {
+        return [];
+    }
+
+    const getScore = (entry) => (safeMode === "quantity" ? entry.quantity : entry.value);
+    const numericEntries = source
+        .filter((entry) => Number.isFinite(getScore(entry)))
+        .sort((a, b) => getScore(b) - getScore(a));
+
+    if (numericEntries.length >= 10) {
+        return numericEntries.slice(0, 10);
+    }
+
+    const usedEntries = new Set(numericEntries);
+    const fallbackEntries = source.filter((entry) => {
+        if (usedEntries.has(entry)) {
+            return false;
+        }
+
+        if (safeMode === "quantity") {
+            if (entry.rawQuantity !== null && entry.rawQuantity !== undefined && entry.rawQuantity !== "") {
+                return true;
+            }
+        } else if (entry.rawValue !== null && entry.rawValue !== undefined && entry.rawValue !== "") {
+            return true;
+        }
+
+        return Boolean(entry.item || entry.description);
+    });
+
+    return numericEntries.concat(fallbackEntries).slice(0, 10);
+}
+
+function refreshCorteTop10Table() {
+    const rankedEntries = getCorteTop10EntriesForMode(corteTop10Mode);
+    populateCorteTop10Table(rankedEntries, corteTop10Mode);
+    updateCorteTop10StatusMessage(rankedEntries);
+    return rankedEntries;
+}
+
+function handleCorteTop10ToggleChange() {
+    const isQuantityMode = Boolean(corteTop10Toggle?.checked);
+    corteTop10Mode = isQuantityMode ? "quantity" : "value";
+    updateCorteTop10ToggleAria();
+    updateCorteTop10ColumnHeader();
+    refreshCorteTop10Table();
+}
+
+function updateCorteTop10ColumnHeader() {
+    if (corteTop10HeaderLabel) {
+        corteTop10HeaderLabel.textContent = corteTop10Mode === "quantity" ? "Qtd. cortada" : "Valor cortado";
+    }
+
+    if (corteTop10HeaderIcon) {
+        corteTop10HeaderIcon.textContent = corteTop10Mode === "quantity" ? "format_list_numbered" : "payments";
+    }
+}
+
+function updateCorteTop10ToggleAria() {
+    if (!corteTop10Toggle) {
+        return;
+    }
+
+    const isQuantityMode = Boolean(corteTop10Toggle.checked);
+    const toggleLabel = isQuantityMode
+        ? "Exibindo ranking por quantidade cortada"
+        : "Exibindo ranking por valor cortado";
+    corteTop10Toggle.setAttribute("aria-label", toggleLabel);
+
+    const switchContainer = corteTop10Toggle.closest(".switch");
+    if (switchContainer) {
+        const actionLabel = isQuantityMode
+            ? "Alternar para ranking por valor cortado"
+            : "Alternar para ranking por quantidade cortada";
+        switchContainer.setAttribute("aria-label", actionLabel);
+    }
+}
+
+function updateCorteTop10StatusMessage(entries) {
+    if (!corteTop10StatusDOM) {
+        return;
+    }
+
+    const state = corteTop10StatusDOM.dataset.corteTop10State;
+    if (state !== "ready") {
+        return;
+    }
+
+    if (Array.isArray(entries) && entries.length) {
+        corteTop10StatusDOM.textContent = "";
+        corteTop10StatusDOM.classList.add("status-message--hidden");
+    } else {
+        corteTop10StatusDOM.textContent = "Sem dados disponíveis.";
+        corteTop10StatusDOM.classList.remove("status-message--hidden");
+    }
 }
 
 function loadInventarioDataset(statusElement) {
