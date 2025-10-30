@@ -1153,7 +1153,7 @@ function populateCorteTop10Table(entries) {
     const safeEntries = Array.isArray(entries) ? entries : [];
 
     if (!safeEntries.length) {
-        corteTop10TableBody.innerHTML = '<tr class="corte-top10-table__empty"><td colspan="5">Sem dados disponíveis</td></tr>';
+        corteTop10TableBody.innerHTML = '<tr class="corte-top10-table__empty"><td colspan="3">Sem dados disponíveis</td></tr>';
         return;
     }
 
@@ -1166,16 +1166,25 @@ function populateCorteTop10Table(entries) {
             tableRow.classList.add("is-highlight");
         }
 
-        const rankCell = document.createElement("td");
-        rankCell.className = "corte-top10-table__cell corte-top10-table__cell--rank";
-        rankCell.textContent = String(index + 1);
-
         const itemCell = document.createElement("td");
         itemCell.className = "corte-top10-table__cell corte-top10-table__cell--item";
-        itemCell.textContent = entry.item || "Sem item";
+        const itemWrapper = document.createElement("div");
+        itemWrapper.className = "corte-top10-table__item";
+
+        const rankBadge = document.createElement("span");
+        rankBadge.className = "corte-top10-table__rank-badge";
+        rankBadge.textContent = String(index + 1);
+
+        const itemLabel = document.createElement("span");
+        itemLabel.className = "corte-top10-table__item-label";
+        itemLabel.textContent = entry.item || "Sem item";
         if (entry.item) {
-            itemCell.title = entry.item;
+            itemLabel.title = entry.item;
         }
+
+        itemWrapper.appendChild(rankBadge);
+        itemWrapper.appendChild(itemLabel);
+        itemCell.appendChild(itemWrapper);
 
         const descriptionCell = document.createElement("td");
         descriptionCell.className = "corte-top10-table__cell corte-top10-table__cell--description";
@@ -1188,27 +1197,17 @@ function populateCorteTop10Table(entries) {
         valorCell.className = "corte-top10-table__cell corte-top10-table__cell--valor";
         if (Number.isFinite(entry.value)) {
             valorCell.textContent = currencyFormatter.format(entry.value);
+            if (Number.isFinite(entry.quantity)) {
+                valorCell.title = `${currencyFormatter.format(entry.value)} · ${decimalFormatter.format(entry.quantity)} unidades`;
+            }
         } else if (entry.rawValue !== null && entry.rawValue !== undefined && entry.rawValue !== "") {
             valorCell.textContent = String(entry.rawValue);
         } else {
             valorCell.textContent = "—";
         }
-
-        const quantidadeCell = document.createElement("td");
-        quantidadeCell.className = "corte-top10-table__cell corte-top10-table__cell--quantidade";
-        if (Number.isFinite(entry.quantity)) {
-            quantidadeCell.textContent = decimalFormatter.format(entry.quantity);
-        } else if (entry.rawQuantity !== null && entry.rawQuantity !== undefined && entry.rawQuantity !== "") {
-            quantidadeCell.textContent = String(entry.rawQuantity);
-        } else {
-            quantidadeCell.textContent = "—";
-        }
-
-        tableRow.appendChild(rankCell);
         tableRow.appendChild(itemCell);
         tableRow.appendChild(descriptionCell);
         tableRow.appendChild(valorCell);
-        tableRow.appendChild(quantidadeCell);
         corteTop10TableBody.appendChild(tableRow);
     });
 }

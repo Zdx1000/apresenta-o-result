@@ -304,22 +304,40 @@
 								<div class="corte-setores-card__table-header">
 									<span class="material-symbols-rounded corte-setores-card__table-icon" aria-hidden="true">trophy</span>
 									<h3 class="corte-setores-card__table-title">Top 10 itens cortados</h3>
+									<label class="switch" aria-label="Alternar modo do ranking">
+										<input class="toggle" type="checkbox" />
+										<span class="slider"></span>
+										<span class="card-side"></span>
+									</label>
 								</div>
 								<p class="status-message" data-status="corte-top10">Carregando ranking...</p>
 								<div class="corte-top10-table" role="region" aria-label="Tabela com os dez itens mais cortados">
 									<table class="corte-top10-table__inner">
 										<thead>
 											<tr>
-												<th scope="col" class="corte-top10-table__heading corte-top10-table__heading--rank">#</th>
-												<th scope="col" class="corte-top10-table__heading corte-top10-table__heading--item">Item</th>
-												<th scope="col" class="corte-top10-table__heading corte-top10-table__heading--description">Descrição</th>
-												<th scope="col" class="corte-top10-table__heading corte-top10-table__heading--valor">Valor cortado</th>
-												<th scope="col" class="corte-top10-table__heading corte-top10-table__heading--quantidade">Qtde</th>
+												<th scope="col" class="corte-top10-table__heading corte-top10-table__heading--item">
+													<span class="corte-top10-table__header-content">
+														<span class="material-symbols-rounded corte-top10-table__header-icon" aria-hidden="true">inventory_2</span>
+														<span class="corte-top10-table__header-label">Item</span>
+													</span>
+												</th>
+												<th scope="col" class="corte-top10-table__heading corte-top10-table__heading--description">
+													<span class="corte-top10-table__header-content">
+														<span class="material-symbols-rounded corte-top10-table__header-icon" aria-hidden="true">description</span>
+														<span class="corte-top10-table__header-label">Descrição</span>
+													</span>
+												</th>
+												<th scope="col" class="corte-top10-table__heading corte-top10-table__heading--valor">
+													<span class="corte-top10-table__header-content">
+														<span class="material-symbols-rounded corte-top10-table__header-icon" aria-hidden="true">payments</span>
+														<span class="corte-top10-table__header-label">Valor cortado</span>
+													</span>
+												</th>
 											</tr>
 										</thead>
 										<tbody data-corte-top10-body>
 											<tr class="corte-top10-table__empty">
-												<td colspan="5">Sem dados disponíveis</td>
+												<td colspan="3">Sem dados disponíveis</td>
 											</tr>
 										</tbody>
 									</table>
