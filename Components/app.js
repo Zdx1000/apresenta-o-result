@@ -1,6 +1,8 @@
 const API_ENDPOINT_BLOQUEADO = "/api/bloqueado";
 const API_ENDPOINT_CORTE = "/api/corte";
 const API_ENDPOINT_CORTE_MOTIVOS = "/api/corte/motivos";
+const API_ENDPOINT_CORTE_SETORES = "/api/corte/setores";
+const API_ENDPOINT_CORTE_TOP10 = "/api/corte/top10";
 const API_ENDPOINT_INVENTARIO = "/api/inventario";
 
 const currencyFormatter = new Intl.NumberFormat("pt-BR", {
@@ -22,12 +24,15 @@ const decimalFormatter = new Intl.NumberFormat("pt-BR", {
 
 let bloqueadoChartInstance = null;
 let corteChartInstance = null;
+let corteSetoresChartInstance = null;
 let inventarioChartInstance = null;
 let metricsDOM = null;
 let corteMetricsDOM = null;
 let motivosTableBody = null;
 let corteDatasetCache = null;
 let corteMotivosSummary = [];
+let corteSetoresDatasetCache = null;
+let corteTop10TableBody = null;
 let inventarioDatasetCache = null;
 let inventarioValoresDOM = null;
 let inventarioMetricsDOM = null;
@@ -55,6 +60,18 @@ const BLOQUEADO_TOP10_DESCRIPTION_CANDIDATES = ["Descrição", "Descricao", "Ite
 const BLOQUEADO_TOP10_QUANTITY_CANDIDATES = ["Qtd. Bloq. Estoque", "Quantidade", "Qtd"];
 const BLOQUEADO_TOP10_VALUE_CANDIDATES = ["Valor Bloquado", "Valor Bloqueado", "Valor"];
 const BLOQUEADO_TOP10_REASON_CANDIDATES = ["Motivo do Bloqueio", "Motivo", "Justificativa"];
+const CORTE_SETORES_LABEL_CANDIDATES = ["Setor", "Setores", "Departamento", "Categoria", "Grupo"];
+const CORTE_SETORES_VALUE_CANDIDATES = ["Soma de Valor Total", "Valor Total", "Total", "Valor", "Soma"];
+const CORTE_TOP10_ITEM_CANDIDATES = ["Itens", "Item", "Código", "Codigo", "SKU"];
+const CORTE_TOP10_DESCRIPTION_CANDIDATES = ["Descrição", "Descricao", "Item Descrição", "Item Descricao", "Produto"];
+const CORTE_TOP10_VALUE_CANDIDATES = [
+    "Soma de Valor Total Corte/Pedido",
+    "Soma de Valor Total",
+    "Valor Total",
+    "Valor",
+    "Soma",
+];
+const CORTE_TOP10_QUANTITY_CANDIDATES = ["Soma de Qtde", "Quantidade", "Qtd", "Qtde"];
 
 const normalizeKeyName = (key) => {
     if (typeof key !== "string") {
@@ -160,8 +177,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const bloqueadoTop10StatusElement = document.querySelector('[data-status="bloqueado-top10"]');
     const corteStatusElement = document.querySelector('[data-status="corte"]');
     const corteMotivosStatusElement = document.querySelector('[data-status="corte-motivos"]');
+    const corteSetoresStatusElement = document.querySelector('[data-status="corte-setores"]');
+    const corteTop10StatusElement = document.querySelector('[data-status="corte-top10"]');
     const inventarioStatusElement = document.querySelector('[data-status="inventario"]');
     motivosTableBody = document.querySelector("[data-motivos-body]");
+    corteTop10TableBody = document.querySelector("[data-corte-top10-body]");
     bloqueadoTop10List = document.querySelector("[data-bloqueado-top10-list]");
     bloqueadoTop10Insights = collectBloqueadoTop10Insights();
     metricsDOM = collectMetricElements();
@@ -182,6 +202,8 @@ document.addEventListener("DOMContentLoaded", () => {
     loadBloqueadoTop10Dataset(bloqueadoTop10StatusElement);
     loadCorteDataset(corteStatusElement);
     loadCorteMotivosDataset(corteMotivosStatusElement);
+    loadCorteSetoresDataset(corteSetoresStatusElement);
+    loadCorteTop10Dataset(corteTop10StatusElement);
     loadInventarioDataset(inventarioStatusElement);
 });
 
@@ -667,6 +689,21 @@ function initCorteSetoresToggle() {
         showSecondaryLabel: "Corte Setores",
         showPrimaryLabel: "Corte por Faturamento",
     });
+
+    const toggleButton = document.querySelector("[data-corte-toggle]");
+    const secondarySection = document.querySelector("[data-corte-setores]");
+
+    if (toggleButton && secondarySection) {
+        toggleButton.addEventListener("click", () => {
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    if (secondarySection.getAttribute("aria-hidden") !== "true" && corteSetoresChartInstance) {
+                        corteSetoresChartInstance.resize();
+                    }
+                }, 320);
+            });
+        });
+    }
 }
 
 function initInventarioCanceladosToggle() {
@@ -735,6 +772,445 @@ function loadCorteMotivosDataset(statusElement) {
                 statusElement.classList.remove("status-message--hidden");
             }
         });
+}
+
+function loadCorteSetoresDataset(statusElement) {
+    fetch(API_ENDPOINT_CORTE_SETORES)
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error("Falha ao carregar os dados de corte por setor");
+            }
+            return response.json();
+        })
+        .then((payload) => {
+            const normalizedRows = normalizeCorteSetoresRows(payload?.rows);
+            corteSetoresDatasetCache = normalizedRows;
+            renderCorteSetoresChart(normalizedRows);
+
+            if (statusElement) {
+                if (normalizedRows.length) {
+                    statusElement.textContent = "";
+                    statusElement.classList.add("status-message--hidden");
+                } else {
+                    statusElement.textContent = "Sem dados disponíveis.";
+                    statusElement.classList.remove("status-message--hidden");
+                }
+            }
+        })
+        .catch((error) => {
+            console.error(error);
+            corteSetoresDatasetCache = null;
+            if (statusElement) {
+                statusElement.textContent = "Nao foi possivel carregar os dados.";
+                statusElement.classList.remove("status-message--hidden");
+            }
+            renderCorteSetoresChart([]);
+        });
+}
+
+function loadCorteTop10Dataset(statusElement) {
+    fetch(API_ENDPOINT_CORTE_TOP10)
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error("Falha ao carregar o ranking de itens cortados");
+            }
+            return response.json();
+        })
+        .then((payload) => {
+            const summary = normalizeCorteTop10Rows(payload?.rows);
+            populateCorteTop10Table(summary);
+
+            if (statusElement) {
+                if (summary.length) {
+                    statusElement.textContent = "";
+                    statusElement.classList.add("status-message--hidden");
+                } else {
+                    statusElement.textContent = "Sem dados disponíveis.";
+                    statusElement.classList.remove("status-message--hidden");
+                }
+            }
+        })
+        .catch((error) => {
+            console.error(error);
+            populateCorteTop10Table([]);
+            if (statusElement) {
+                statusElement.textContent = "Nao foi possivel carregar os dados.";
+                statusElement.classList.remove("status-message--hidden");
+            }
+        });
+}
+
+function normalizeCorteSetoresRows(rows) {
+    const safeRows = Array.isArray(rows) ? rows : [];
+    const mapped = safeRows.map((row) => {
+        const labelValue = extractValueFromRow(row, CORTE_SETORES_LABEL_CANDIDATES);
+        const totalValue = extractValueFromRow(row, CORTE_SETORES_VALUE_CANDIDATES);
+        const numericTotal = parseNumericValue(totalValue);
+
+        return {
+            label: labelValue !== null && labelValue !== undefined ? String(labelValue) : "",
+            value: Number.isFinite(numericTotal) ? numericTotal : null,
+            rawValue: totalValue,
+        };
+    });
+
+    const filtered = mapped.filter((entry) => entry.label || Number.isFinite(entry.value));
+    filtered.sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+    return filtered;
+}
+
+function renderCorteSetoresChart(rows) {
+    const canvasElement = document.getElementById("corteSetoresChart");
+    if (!canvasElement) {
+        return;
+    }
+
+    if (corteSetoresChartInstance) {
+        corteSetoresChartInstance.destroy();
+        corteSetoresChartInstance = null;
+    }
+
+    if (!Array.isArray(rows) || !rows.length) {
+        const context = canvasElement.getContext("2d");
+        if (context) {
+            const width = canvasElement.width || canvasElement.clientWidth || 0;
+            const height = canvasElement.height || canvasElement.clientHeight || 0;
+            context.clearRect(0, 0, width, height);
+        }
+        return;
+    }
+
+    const topEntries = rows.slice(0, 12);
+    const labels = topEntries.map((entry) => entry.label || "Sem setor");
+    const values = topEntries.map((entry) => (Number.isFinite(entry.value) ? entry.value : 0));
+
+    const styles = getComputedStyle(document.documentElement);
+    const axisColor = styles.getPropertyValue("--color-axis").trim() || "#7d8597";
+    const gridColor = styles.getPropertyValue("--color-grid").trim() || "rgba(0, 31, 84, 0.08)";
+    const textMain = styles.getPropertyValue("--color-text-main").trim() || "#1f2430";
+
+    const highlightGradients = [
+        ["rgba(10, 5, 143, 1)", "rgba(4, 4, 90, 1)"],
+        ["rgba(0, 42, 220, 0.88)", "rgba(0, 31, 84, 0.84)"],
+        ["rgba(0, 42, 220, 0.82)", "rgba(0, 31, 84, 0.78)"],
+        ["rgba(0, 42, 220, 0.76)", "rgba(0, 31, 84, 0.72)"],
+        ["rgba(0, 42, 220, 0.7)", "rgba(0, 31, 84, 0.66)"],
+    ];
+    const highlightBorderPalette = [
+        "rgba(3, 7, 59, 0.98)",
+        "rgba(0, 31, 84, 0.92)",
+        "rgba(0, 31, 84, 0.9)",
+        "rgba(0, 31, 84, 0.88)",
+        "rgba(0, 31, 84, 0.86)",
+    ];
+    const neutralGradient = ["rgba(0, 31, 84, 0.18)", "rgba(0, 31, 84, 0.1)"];
+    const neutralBorderColor = "rgba(0, 31, 84, 0.32)";
+    const neutralBorderHoverColor = "rgba(0, 31, 84, 0.48)";
+    const highlightHoverBorderPalette = [
+        "rgba(12, 5, 112, 1)",
+        "rgba(0, 31, 84, 0.96)",
+        "rgba(0, 31, 84, 0.94)",
+        "rgba(0, 31, 84, 0.92)",
+        "rgba(0, 31, 84, 0.9)",
+    ];
+    const highlightLabelColor = "rgba(0, 31, 84, 0.92)";
+    const neutralLabelColor = "rgba(31, 36, 48, 0.66)";
+
+    const highlightCount = Math.min(5, labels.length);
+
+    const createGradient = (ctx, chartArea, stops) => {
+        if (!Array.isArray(stops) || stops.length === 0) {
+            return neutralGradient[0];
+        }
+        if (!chartArea) {
+            return stops[0];
+        }
+        const gradient = ctx.createLinearGradient(chartArea.left, chartArea.top, chartArea.right, chartArea.top);
+        gradient.addColorStop(0, stops[0]);
+        gradient.addColorStop(1, stops[1] || stops[0]);
+        return gradient;
+    };
+
+    const corteSetoresValueLabels = {
+        id: "corteSetoresValueLabels",
+        afterDatasetsDraw(chart) {
+            const meta = chart.getDatasetMeta(0);
+            if (!meta) {
+                return;
+            }
+
+            const { ctx } = chart;
+            ctx.save();
+            ctx.textBaseline = "middle";
+            ctx.font = "600 13px Segoe UI, Tahoma";
+
+            meta.data.forEach((barElement, index) => {
+                const value = values[index];
+                if (!barElement || !Number.isFinite(value)) {
+                    return;
+                }
+
+                const { x, y } = barElement.tooltipPosition();
+                const label = currencyFormatter.format(value);
+                const padding = 10;
+                const textWidth = ctx.measureText(label).width;
+                const chartArea = chart.chartArea;
+                const chartRight = chartArea ? chartArea.right - 6 : ctx.canvas.width - 24;
+                let drawX = x + padding;
+                let textAlign = "left";
+
+                if (drawX + textWidth > chartRight) {
+                    drawX = x - padding;
+                    textAlign = "right";
+                }
+
+                if (!Number.isFinite(drawX)) {
+                    drawX = x;
+                }
+
+                ctx.textAlign = textAlign;
+                ctx.fillStyle = index < highlightCount ? highlightLabelColor : neutralLabelColor;
+                ctx.fillText(label, drawX, y);
+            });
+
+            ctx.restore();
+        },
+    };
+
+    corteSetoresChartInstance = new Chart(canvasElement, {
+        type: "bar",
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: "Valor cortado",
+                    data: values,
+                    backgroundColor(context) {
+                        const index = context.dataIndex;
+                        const { chart } = context;
+                        const { ctx, chartArea } = chart;
+                        if (index < highlightCount) {
+                            const paletteIndex = Math.min(index, highlightGradients.length - 1);
+                            const stops = highlightGradients[paletteIndex];
+                            return createGradient(ctx, chartArea, stops);
+                        }
+                        return createGradient(ctx, chartArea, neutralGradient);
+                    },
+                    borderColor(context) {
+                        const index = context.dataIndex;
+                        if (index < highlightCount) {
+                            const paletteIndex = Math.min(index, highlightBorderPalette.length - 1);
+                            return highlightBorderPalette[paletteIndex];
+                        }
+                        return neutralBorderColor;
+                    },
+                    hoverBackgroundColor(context) {
+                        const index = context.dataIndex;
+                        const { chart } = context;
+                        const { ctx, chartArea } = chart;
+                        if (index < highlightCount) {
+                            const paletteIndex = Math.min(index, highlightGradients.length - 1);
+                            const stops = highlightGradients[paletteIndex];
+                            return createGradient(ctx, chartArea, stops);
+                        }
+                        return createGradient(ctx, chartArea, neutralGradient);
+                    },
+                    hoverBorderColor(context) {
+                        const index = context.dataIndex;
+                        if (index < highlightCount) {
+                            const paletteIndex = Math.min(index, highlightHoverBorderPalette.length - 1);
+                            return highlightHoverBorderPalette[paletteIndex];
+                        }
+                        return neutralBorderHoverColor;
+                    },
+                    borderWidth: 1.2,
+                    borderRadius: 2,
+                    borderSkipped: false,
+                    barPercentage: 0.86,
+                    categoryPercentage: 0.76,
+                    maxBarThickness: 44,
+                },
+            ],
+        },
+        options: {
+            indexAxis: "y",
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false,
+                },
+                tooltip: {
+                    callbacks: {
+                        label(context) {
+                            const value = Number.isFinite(context.parsed?.x) ? context.parsed.x : 0;
+                            const label = context.dataset?.label || "Valor cortado";
+                            return `${label}: ${currencyFormatter.format(value)}`;
+                        },
+                        labelColor(context) {
+                            const index = context.dataIndex;
+                            if (index < highlightCount) {
+                                const paletteIndex = Math.min(index, highlightBorderPalette.length - 1);
+                                const borderColor = highlightBorderPalette[paletteIndex];
+                                return {
+                                    borderColor,
+                                    backgroundColor: borderColor,
+                                    borderWidth: 2,
+                                    borderDash: [],
+                                };
+                            }
+                            return {
+                                borderColor: neutralBorderColor,
+                                backgroundColor: neutralBorderColor,
+                                borderWidth: 2,
+                                borderDash: [],
+                            };
+                        },
+                        labelTextColor(context) {
+                            return context.dataIndex < highlightCount ? highlightLabelColor : textMain;
+                        },
+                    },
+                },
+            },
+            layout: {
+                padding: {
+                    top: 12,
+                    bottom: 12,
+                    left: 12,
+                    right: 18,
+                },
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: axisColor,
+                        padding: 6,
+                        callback: (value) => {
+                            const numericValue = Number(value);
+                            return currencyFormatter.format(Number.isFinite(numericValue) ? numericValue : 0);
+                        },
+                        maxTicksLimit: 6,
+                    },
+                    grid: {
+                        color: gridColor,
+                        drawBorder: false,
+                        lineWidth: 0.6,
+                    },
+                },
+                y: {
+                    ticks: {
+                        color: textMain,
+                        padding: 8,
+                        font: {
+                            size: 12,
+                            weight: "600",
+                        },
+                    },
+                    grid: {
+                        display: false,
+                    },
+                    border: {
+                        display: false,
+                    },
+                },
+            },
+        },
+        plugins: [corteSetoresValueLabels],
+    });
+}
+
+function normalizeCorteTop10Rows(rows) {
+    const safeRows = Array.isArray(rows) ? rows : [];
+    const mapped = safeRows.map((row) => {
+        const itemValue = extractValueFromRow(row, CORTE_TOP10_ITEM_CANDIDATES);
+        const descriptionValue = extractValueFromRow(row, CORTE_TOP10_DESCRIPTION_CANDIDATES);
+        const totalValue = extractValueFromRow(row, CORTE_TOP10_VALUE_CANDIDATES);
+        const quantityValue = extractValueFromRow(row, CORTE_TOP10_QUANTITY_CANDIDATES);
+        const numericTotal = parseNumericValue(totalValue);
+        const numericQuantity = parseNumericValue(quantityValue);
+
+        return {
+            item: itemValue !== null && itemValue !== undefined ? String(itemValue) : "",
+            description: descriptionValue !== null && descriptionValue !== undefined ? String(descriptionValue) : "",
+            value: Number.isFinite(numericTotal) ? numericTotal : null,
+            rawValue: totalValue,
+            quantity: Number.isFinite(numericQuantity) ? numericQuantity : null,
+            rawQuantity: quantityValue,
+        };
+    });
+
+    const filtered = mapped.filter((entry) => entry.item || Number.isFinite(entry.value));
+    filtered.sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+    return filtered.slice(0, 10);
+}
+
+function populateCorteTop10Table(entries) {
+    if (!corteTop10TableBody) {
+        return;
+    }
+
+    const safeEntries = Array.isArray(entries) ? entries : [];
+
+    if (!safeEntries.length) {
+        corteTop10TableBody.innerHTML = '<tr class="corte-top10-table__empty"><td colspan="5">Sem dados disponíveis</td></tr>';
+        return;
+    }
+
+    corteTop10TableBody.innerHTML = "";
+
+    safeEntries.forEach((entry, index) => {
+        const tableRow = document.createElement("tr");
+        tableRow.className = "corte-top10-table__row";
+        if (index < 3) {
+            tableRow.classList.add("is-highlight");
+        }
+
+        const rankCell = document.createElement("td");
+        rankCell.className = "corte-top10-table__cell corte-top10-table__cell--rank";
+        rankCell.textContent = String(index + 1);
+
+        const itemCell = document.createElement("td");
+        itemCell.className = "corte-top10-table__cell corte-top10-table__cell--item";
+        itemCell.textContent = entry.item || "Sem item";
+        if (entry.item) {
+            itemCell.title = entry.item;
+        }
+
+        const descriptionCell = document.createElement("td");
+        descriptionCell.className = "corte-top10-table__cell corte-top10-table__cell--description";
+        descriptionCell.textContent = entry.description || "Descrição não informada";
+        if (entry.description) {
+            descriptionCell.title = entry.description;
+        }
+
+        const valorCell = document.createElement("td");
+        valorCell.className = "corte-top10-table__cell corte-top10-table__cell--valor";
+        if (Number.isFinite(entry.value)) {
+            valorCell.textContent = currencyFormatter.format(entry.value);
+        } else if (entry.rawValue !== null && entry.rawValue !== undefined && entry.rawValue !== "") {
+            valorCell.textContent = String(entry.rawValue);
+        } else {
+            valorCell.textContent = "—";
+        }
+
+        const quantidadeCell = document.createElement("td");
+        quantidadeCell.className = "corte-top10-table__cell corte-top10-table__cell--quantidade";
+        if (Number.isFinite(entry.quantity)) {
+            quantidadeCell.textContent = decimalFormatter.format(entry.quantity);
+        } else if (entry.rawQuantity !== null && entry.rawQuantity !== undefined && entry.rawQuantity !== "") {
+            quantidadeCell.textContent = String(entry.rawQuantity);
+        } else {
+            quantidadeCell.textContent = "—";
+        }
+
+        tableRow.appendChild(rankCell);
+        tableRow.appendChild(itemCell);
+        tableRow.appendChild(descriptionCell);
+        tableRow.appendChild(valorCell);
+        tableRow.appendChild(quantidadeCell);
+        corteTop10TableBody.appendChild(tableRow);
+    });
 }
 
 function loadInventarioDataset(statusElement) {

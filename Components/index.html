@@ -288,10 +288,43 @@
 						</div>
 					</div>
 					</section>
-					<section class="chart-card chart-card--placeholder panel-view panel-view--secondary" data-corte-setores aria-hidden="true" aria-live="polite">
-						<div class="chart-card__placeholder">
-							<h2 class="chart-card__placeholder-title">Em breve</h2>
-							<p class="chart-card__placeholder-text">Esta seção apresentará o Corte Setores em uma próxima atualização.</p>
+					<section class="chart-card corte-setores-card panel-view panel-view--secondary" data-corte-setores aria-hidden="true" aria-live="polite">
+						<div class="corte-setores-card__layout">
+							<div class="corte-setores-card__chart">
+								<div class="corte-setores-card__chart-header">
+									<span class="material-symbols-rounded corte-setores-card__chart-icon" aria-hidden="true">stacked_bar_chart</span>
+									<h3 class="corte-setores-card__chart-title">Valor cortado por setor</h3>
+								</div>
+								<p class="status-message" data-status="corte-setores">Carregando setores...</p>
+								<div class="corte-setores-card__chart-canvas">
+									<canvas id="corteSetoresChart" role="img" aria-label="Valor cortado por setor"></canvas>
+								</div>
+							</div>
+							<aside class="corte-setores-card__aside" aria-label="Ranking de itens cortados" aria-live="polite">
+								<div class="corte-setores-card__table-header">
+									<span class="material-symbols-rounded corte-setores-card__table-icon" aria-hidden="true">trophy</span>
+									<h3 class="corte-setores-card__table-title">Top 10 itens cortados</h3>
+								</div>
+								<p class="status-message" data-status="corte-top10">Carregando ranking...</p>
+								<div class="corte-top10-table" role="region" aria-label="Tabela com os dez itens mais cortados">
+									<table class="corte-top10-table__inner">
+										<thead>
+											<tr>
+												<th scope="col" class="corte-top10-table__heading corte-top10-table__heading--rank">#</th>
+												<th scope="col" class="corte-top10-table__heading corte-top10-table__heading--item">Item</th>
+												<th scope="col" class="corte-top10-table__heading corte-top10-table__heading--description">Descrição</th>
+												<th scope="col" class="corte-top10-table__heading corte-top10-table__heading--valor">Valor cortado</th>
+												<th scope="col" class="corte-top10-table__heading corte-top10-table__heading--quantidade">Qtde</th>
+											</tr>
+										</thead>
+										<tbody data-corte-top10-body>
+											<tr class="corte-top10-table__empty">
+												<td colspan="5">Sem dados disponíveis</td>
+											</tr>
+										</tbody>
+									</table>
+								</div>
+							</aside>
 						</div>
 					</section>
 				</div>

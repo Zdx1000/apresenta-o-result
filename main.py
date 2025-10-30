@@ -218,6 +218,9 @@ def load_corte_top10_dataframe():
         if "Itens" in dataframe.columns:
             dataframe["Itens"] = dataframe["Itens"].astype(str)
 
+        if "Descrição" in dataframe.columns:
+            dataframe["Descrição"] = dataframe["Descrição"].astype(str)
+
         if "Soma de Valor Total Corte/Pedido" in dataframe.columns:
             dataframe["Soma de Valor Total Corte/Pedido"] = dataframe["Soma de Valor Total Corte/Pedido"].apply(converter_valor)
 
