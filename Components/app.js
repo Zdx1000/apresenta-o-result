@@ -482,6 +482,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initBloqueadoTopToggle();
     initCorteSetoresToggle();
     initInventarioCanceladosToggle();
+    initAvariaToggle();
 
     loadBloqueadoDataset(bloqueadoStatusElement);
     loadBloqueadoTop10Dataset(bloqueadoTop10StatusElement);
@@ -1021,6 +1022,31 @@ function initInventarioCanceladosToggle() {
     }
 }
 
+function initAvariaToggle() {
+    initPanelSlideToggle({
+        toggleSelector: "[data-avaria-toggle]",
+        primarySelector: "[data-avaria-primary]",
+        secondarySelector: "[data-avaria-secondary]",
+        showSecondaryLabel: "Avarias - Motivos",
+        showPrimaryLabel: "Avaria - Avariados",
+    });
+
+    const toggleButton = document.querySelector("[data-avaria-toggle]");
+    const primarySection = document.querySelector("[data-avaria-primary]");
+
+    if (toggleButton && primarySection) {
+        toggleButton.addEventListener("click", () => {
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    if (primarySection.getAttribute("aria-hidden") !== "true" && avariaSetoresChartInstance) {
+                        avariaSetoresChartInstance.resize();
+                    }
+                }, 320);
+            });
+        });
+    }
+}
+
 function loadCorteDataset(statusElement) {
     fetch(API_ENDPOINT_CORTE)
         .then((response) => {
@@ -1372,7 +1398,7 @@ function renderCorteSetoresChart(rows) {
                 }
 
                 ctx.textAlign = textAlign;
-                const labelColor = index === 0 ? "#ffffff" : index < highlightCount ? highlightLabelColor : neutralLabelColor;
+                const labelColor = index === 0 ? "#000000" : index < highlightCount ? highlightLabelColor : neutralLabelColor;
                 ctx.fillStyle = labelColor;
                 ctx.fillText(label, drawX, y);
             });
