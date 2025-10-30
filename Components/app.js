@@ -4,6 +4,8 @@ const API_ENDPOINT_CORTE_MOTIVOS = "/api/corte/motivos";
 const API_ENDPOINT_CORTE_SETORES = "/api/corte/setores";
 const API_ENDPOINT_CORTE_TOP10 = "/api/corte/top10";
 const API_ENDPOINT_INVENTARIO = "/api/inventario";
+const API_ENDPOINT_AVARIA_SETORES = "/api/avaria/setores";
+const API_ENDPOINT_AVARIA_TOP10 = "/api/avaria/top10";
 
 const currencyFormatter = new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -26,6 +28,7 @@ let bloqueadoChartInstance = null;
 let corteChartInstance = null;
 let corteSetoresChartInstance = null;
 let inventarioChartInstance = null;
+let avariaSetoresChartInstance = null;
 let metricsDOM = null;
 let corteMetricsDOM = null;
 let motivosTableBody = null;
@@ -39,9 +42,19 @@ let corteTop10Toggle = null;
 let corteTop10HeaderLabel = null;
 let corteTop10HeaderIcon = null;
 let corteTop10StatusDOM = null;
+let avariaSetoresDatasetCache = null;
+let avariaTop10TableBody = null;
+let avariaTop10Dataset = [];
+let avariaTop10Mode = "value";
+let avariaTop10Toggle = null;
+let avariaTop10HeaderLabel = null;
+let avariaTop10HeaderIcon = null;
+let avariaTop10StatusDOM = null;
 let inventarioDatasetCache = null;
 let inventarioValoresDOM = null;
 let inventarioMetricsDOM = null;
+let inventarioCanceladosChartInstance = null;
+let inventarioCanceladosDOM = null;
 let bloqueadoDatasetCache = null;
 let bloqueadoTop10List = null;
 let bloqueadoTop10Insights = null;
@@ -60,6 +73,123 @@ const INVENTARIO_VALORES_AJUSTE_SOBRA_CANDIDATES = ["5 Ajuste Inv. Sobra", "Ajus
 const INVENTARIO_VALORES_ABSOLUTO_CANDIDATES = ["Valor Absoluto"];
 const INVENTARIO_VALORES_MODULAR_CANDIDATES = ["Valor Modular"];
 const INVENTARIO_VALORES_PERCENT_CANDIDATES = ["% Ajuste", "Percentual Ajuste"];
+const INVENTARIO_CANCELADOS_REASON_CANDIDATES = [
+    "Motivo de Cancelamento",
+    "Motivo do Cancelamento",
+    "Motivo",
+    "Motivo Cancelado",
+    "Razão",
+    "Razao",
+];
+const INVENTARIO_CANCELADOS_VALUE_CANDIDATES = [
+    "Valor cancelado",
+    "Valor Cancelado",
+    "Valor",
+    "Total",
+    "Valor Total",
+];
+const INVENTARIO_CANCELADOS_MAX_SEGMENTS = 6;
+const INVENTARIO_CANCELADOS_COLOR_PALETTE = [
+    "#0a058f",
+    "#0030d0",
+    "#005ce6",
+    "#008ed6",
+    "#00b3c4",
+    "#4f5d75",
+];
+const INVENTARIO_CANCELADOS_PIE_SHADOW_PLUGIN = {
+    id: "inventarioCanceladosPieShadow",
+    beforeDatasetsDraw(chart, args, pluginOptions) {
+        const ctx = chart?.ctx;
+        if (!ctx) {
+            return;
+        }
+        ctx.save();
+        chart.$inventarioCanceladosShadowApplied = true;
+        ctx.shadowColor = pluginOptions?.shadowColor ?? "rgba(0, 31, 84, 0.18)";
+        ctx.shadowBlur = pluginOptions?.shadowBlur ?? 26;
+        ctx.shadowOffsetX = pluginOptions?.shadowOffsetX ?? 0;
+        ctx.shadowOffsetY = pluginOptions?.shadowOffsetY ?? 14;
+    },
+    afterDatasetsDraw(chart) {
+        const ctx = chart?.ctx;
+        if (ctx && chart.$inventarioCanceladosShadowApplied) {
+            ctx.restore();
+            delete chart.$inventarioCanceladosShadowApplied;
+        }
+    },
+};
+const INVENTARIO_CANCELADOS_PIE_LABELS_PLUGIN = {
+    id: "inventarioCanceladosPieLabels",
+    afterDatasetsDraw(chart, args, pluginOptions) {
+        const ctx = chart?.ctx;
+        if (!ctx) {
+            return;
+        }
+
+        const meta = chart.getDatasetMeta(0);
+        if (!meta || meta.hidden) {
+            return;
+        }
+
+        const dataset = chart.data.datasets[meta.index];
+        if (!dataset) {
+            return;
+        }
+
+        const slices = meta.data || [];
+        const shares = Array.isArray(dataset._inventarioShares) ? dataset._inventarioShares : [];
+        const colors = Array.isArray(dataset.backgroundColor) ? dataset.backgroundColor : [];
+        const minShare = Number.isFinite(pluginOptions?.minShare) ? pluginOptions.minShare : 0.03;
+        const formatter = typeof pluginOptions?.formatter === "function"
+            ? pluginOptions.formatter
+            : (value) => percentageFormatter.format(value);
+
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.shadowColor = "transparent";
+
+        slices.forEach((slice, index) => {
+            const share = shares[index];
+            if (!slice || !Number.isFinite(share) || share <= minShare) {
+                return;
+            }
+
+            const label = formatter(share, index, dataset);
+            if (!label) {
+                return;
+            }
+
+            const position = slice.tooltipPosition();
+            const sliceColor = colors[index % colors.length];
+            ctx.fillStyle = getContrastingTextColor(sliceColor, "#ffffff");
+            ctx.font = pluginOptions?.font || "600 13px 'Segoe UI', Tahoma";
+            ctx.fillText(label, position.x, position.y);
+        });
+
+        ctx.restore();
+    },
+};
+const INVENTARIO_CANCELADOS_MOTIVE_CANDIDATES = [
+    "Motivos",
+    "Motivo",
+    "Motivo Cancelado",
+    "Motivo de Cancelamento",
+    "Motivos Cancelamento",
+    "Descrição",
+    "Descricao",
+];
+const INVENTARIO_CANCELADOS_OBSERVATION_CANDIDATES = [
+    "Observação",
+    "Observacao",
+    "Observações",
+    "Observacoes",
+    "Detalhe",
+    "Detalhes",
+    "Nota",
+    "Notas",
+];
 
 const BLOQUEADO_TOP10_ITEM_CANDIDATES = ["Item"];
 const BLOQUEADO_TOP10_DESCRIPTION_CANDIDATES = ["Descrição", "Descricao", "Item Descricao"];
@@ -80,6 +210,45 @@ const CORTE_TOP10_VALUE_CANDIDATES = [
 ];
 const CORTE_TOP10_QUANTITY_CANDIDATES = ["Soma de Qtde", "Quantidade", "Qtd", "Qtde"];
 const CORTE_TOP10_PRIMARY_VALUE_KEY = "Soma de Valor Total Corte/Pedido";
+const AVARIA_SETORES_LABEL_CANDIDATES = ["Setores", "Setor", "Departamento", "Categoria", "Grupo"];
+const AVARIA_SETORES_VALUE_CANDIDATES = ["Valor Avariado", "Valor", "Total", "Soma"];
+const AVARIA_SETORES_QUANTITY_CANDIDATES = ["Quantidade", "Qtd", "Qtde", "Qtd Avariada"];
+const AVARIA_TOP10_ITEM_CANDIDATES = ["ITEM", "Item", "SKU", "Código", "Codigo"];
+const AVARIA_TOP10_DESCRIPTION_CANDIDATES = [
+    "DESCRIÇÃO DO ITEM",
+    "Descrição do Item",
+    "Descrição",
+    "Descricao",
+    "Produto",
+];
+const AVARIA_TOP10_VALUE_CANDIDATES = ["Valor", "Valor Avariado", "Total"];
+const AVARIA_TOP10_QUANTITY_CANDIDATES = ["Quantidade", "Qtd", "Qtde", "Qtd Avariada", "Volume"];
+const SETORES_CHART_HIGHLIGHT_GRADIENTS = [
+    ["rgba(10, 5, 143, 1)", "rgba(4, 4, 90, 1)"],
+    ["rgba(0, 42, 220, 0.88)", "rgba(0, 31, 84, 0.84)"],
+    ["rgba(0, 42, 220, 0.82)", "rgba(0, 31, 84, 0.78)"],
+    ["rgba(0, 42, 220, 0.76)", "rgba(0, 31, 84, 0.72)"],
+    ["rgba(0, 42, 220, 0.7)", "rgba(0, 31, 84, 0.66)"],
+];
+const SETORES_CHART_HIGHLIGHT_BORDER_PALETTE = [
+    "rgba(3, 7, 59, 0.98)",
+    "rgba(0, 31, 84, 0.92)",
+    "rgba(0, 31, 84, 0.9)",
+    "rgba(0, 31, 84, 0.88)",
+    "rgba(0, 31, 84, 0.86)",
+];
+const SETORES_CHART_NEUTRAL_GRADIENT = ["rgba(0, 31, 84, 0.18)", "rgba(0, 31, 84, 0.1)"];
+const SETORES_CHART_NEUTRAL_BORDER_COLOR = "rgba(0, 31, 84, 0.32)";
+const SETORES_CHART_NEUTRAL_BORDER_HOVER_COLOR = "rgba(0, 31, 84, 0.48)";
+const SETORES_CHART_HIGHLIGHT_HOVER_BORDER_PALETTE = [
+    "rgba(12, 5, 112, 1)",
+    "rgba(0, 31, 84, 0.96)",
+    "rgba(0, 31, 84, 0.94)",
+    "rgba(0, 31, 84, 0.92)",
+    "rgba(0, 31, 84, 0.9)",
+];
+const SETORES_CHART_HIGHLIGHT_LABEL_COLOR = "rgba(0, 31, 84, 0.92)";
+const SETORES_CHART_NEUTRAL_LABEL_COLOR = "rgba(31, 36, 48, 0.66)";
 
 const normalizeKeyName = (key) => {
     if (typeof key !== "string") {
@@ -163,6 +332,92 @@ const parseNumericValue = (value) => {
     return null;
 };
 
+const adjustHexColor = (hexColor, amount = 0) => {
+    if (typeof hexColor !== "string") {
+        return hexColor;
+    }
+
+    const sanitized = hexColor.trim();
+    const hexPattern = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+    if (!hexPattern.test(sanitized)) {
+        return hexColor;
+    }
+
+    let normalized = sanitized.slice(1);
+    if (normalized.length === 3) {
+        normalized = normalized
+            .split("")
+            .map((char) => char + char)
+            .join("");
+    }
+
+    const numeric = Number.parseInt(normalized, 16);
+    if (!Number.isFinite(numeric)) {
+        return hexColor;
+    }
+
+    const extractChannel = (shift) => (numeric >> shift) & 0xff;
+    const clampChannel = (value) => Math.min(255, Math.max(0, Math.round(value)));
+    const ratio = Math.min(Math.abs(amount), 1);
+    const target = amount >= 0 ? 255 : 0;
+
+    const mixChannel = (channel) => clampChannel(channel + (target - channel) * ratio);
+
+    const r = mixChannel(extractChannel(16));
+    const g = mixChannel(extractChannel(8));
+    const b = mixChannel(extractChannel(0));
+
+    const composed = (r << 16) | (g << 8) | b;
+    return `#${composed.toString(16).padStart(6, "0")}`;
+};
+
+const getHexLuminance = (hexColor) => {
+    if (typeof hexColor !== "string") {
+        return 0;
+    }
+
+    const sanitized = hexColor.trim();
+    const hexPattern = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+    if (!hexPattern.test(sanitized)) {
+        return 0;
+    }
+
+    let normalized = sanitized.slice(1);
+    if (normalized.length === 3) {
+        normalized = normalized
+            .split("")
+            .map((char) => char + char)
+            .join("");
+    }
+
+    const numeric = Number.parseInt(normalized, 16);
+    if (!Number.isFinite(numeric)) {
+        return 0;
+    }
+
+    const extractChannel = (shift) => (numeric >> shift) & 0xff;
+    const srgbToLinear = (channel) => {
+        const normalizedChannel = channel / 255;
+        return normalizedChannel <= 0.03928
+            ? normalizedChannel / 12.92
+            : Math.pow((normalizedChannel + 0.055) / 1.055, 2.4);
+    };
+
+    const r = srgbToLinear(extractChannel(16));
+    const g = srgbToLinear(extractChannel(8));
+    const b = srgbToLinear(extractChannel(0));
+
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+const getContrastingTextColor = (hexColor, fallback = "#ffffff") => {
+    const luminance = getHexLuminance(hexColor);
+    if (!(luminance > 0)) {
+        return fallback;
+    }
+    return luminance > 0.56 ? "#1f2430" : "#ffffff";
+};
+
 const normalizeMotivosRows = (rows) => {
     const safeRows = Array.isArray(rows) ? rows : [];
     const summary = safeRows.map((row) => {
@@ -188,24 +443,36 @@ document.addEventListener("DOMContentLoaded", () => {
     const corteMotivosStatusElement = document.querySelector('[data-status="corte-motivos"]');
     const corteSetoresStatusElement = document.querySelector('[data-status="corte-setores"]');
     corteTop10StatusDOM = document.querySelector('[data-status="corte-top10"]');
+    const avariaSetoresStatusElement = document.querySelector('[data-status="avaria-setores"]');
+    avariaTop10StatusDOM = document.querySelector('[data-status="avaria-top10"]');
     const inventarioStatusElement = document.querySelector('[data-status="inventario"]');
     motivosTableBody = document.querySelector("[data-motivos-body]");
     corteTop10TableBody = document.querySelector("[data-corte-top10-body]");
+    avariaTop10TableBody = document.querySelector("[data-avaria-top10-body]");
     corteTop10Toggle = document.querySelector('[data-corte-top10-toggle]');
     corteTop10HeaderLabel = document.querySelector('[data-corte-top10-header]');
     corteTop10HeaderIcon = document.querySelector('[data-corte-top10-header-icon]');
+    avariaTop10Toggle = document.querySelector('[data-avaria-top10-toggle]');
+    avariaTop10HeaderLabel = document.querySelector('[data-avaria-top10-header]');
+    avariaTop10HeaderIcon = document.querySelector('[data-avaria-top10-header-icon]');
     bloqueadoTop10List = document.querySelector("[data-bloqueado-top10-list]");
     bloqueadoTop10Insights = collectBloqueadoTop10Insights();
     metricsDOM = collectMetricElements();
     corteMetricsDOM = collectCorteMetricElements();
     inventarioMetricsDOM = collectInventarioMetricElements();
     inventarioValoresDOM = collectInventarioValoresElements();
+    inventarioCanceladosDOM = collectInventarioCanceladosElements();
 
     if (corteTop10Toggle) {
         corteTop10Toggle.addEventListener('change', handleCorteTop10ToggleChange);
         updateCorteTop10ToggleAria();
     }
     updateCorteTop10ColumnHeader();
+    if (avariaTop10Toggle) {
+        avariaTop10Toggle.addEventListener("change", handleAvariaTop10ToggleChange);
+        updateAvariaTop10ToggleAria();
+    }
+    updateAvariaTop10ColumnHeader();
     clearMetrics();
     clearCorteMetrics();
     clearInventarioMetrics();
@@ -222,6 +489,8 @@ document.addEventListener("DOMContentLoaded", () => {
     loadCorteMotivosDataset(corteMotivosStatusElement);
     loadCorteSetoresDataset(corteSetoresStatusElement);
     loadCorteTop10Dataset(corteTop10StatusDOM);
+    loadAvariaSetoresDataset(avariaSetoresStatusElement);
+    loadAvariaTop10Dataset(avariaTop10StatusDOM);
     loadInventarioDataset(inventarioStatusElement);
 });
 
@@ -732,6 +1001,24 @@ function initInventarioCanceladosToggle() {
         showSecondaryLabel: "Inventário cancelados",
         showPrimaryLabel: "Inventário Rotativo",
     });
+
+    const toggleButton = document.querySelector("[data-inventario-toggle]");
+    const secondarySection = document.querySelector("[data-inventario-cancelados]");
+
+    if (toggleButton && secondarySection) {
+        toggleButton.addEventListener("click", () => {
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    if (
+                        secondarySection.getAttribute("aria-hidden") !== "true" &&
+                        inventarioCanceladosChartInstance
+                    ) {
+                        inventarioCanceladosChartInstance.resize();
+                    }
+                }, 320);
+            });
+        });
+    }
 }
 
 function loadCorteDataset(statusElement) {
@@ -853,6 +1140,67 @@ function loadCorteTop10Dataset(statusElement) {
         });
 }
 
+function loadAvariaSetoresDataset(statusElement) {
+    fetch(API_ENDPOINT_AVARIA_SETORES)
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error("Falha ao carregar os dados de avarias por setor");
+            }
+            return response.json();
+        })
+        .then((payload) => {
+            const normalizedRows = normalizeAvariaSetoresRows(payload?.rows);
+            avariaSetoresDatasetCache = normalizedRows;
+            renderAvariaSetoresChart(normalizedRows);
+
+            if (statusElement) {
+                if (normalizedRows.length) {
+                    statusElement.textContent = "";
+                    statusElement.classList.add("status-message--hidden");
+                } else {
+                    statusElement.textContent = "Sem dados disponíveis.";
+                    statusElement.classList.remove("status-message--hidden");
+                }
+            }
+        })
+        .catch((error) => {
+            console.error(error);
+            avariaSetoresDatasetCache = null;
+            if (statusElement) {
+                statusElement.textContent = "Nao foi possivel carregar os dados.";
+                statusElement.classList.remove("status-message--hidden");
+            }
+            renderAvariaSetoresChart([]);
+        });
+}
+
+function loadAvariaTop10Dataset(statusElement) {
+    fetch(API_ENDPOINT_AVARIA_TOP10)
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error("Falha ao carregar o ranking de itens avariados");
+            }
+            return response.json();
+        })
+        .then((payload) => {
+            avariaTop10Dataset = normalizeAvariaTop10Rows(payload);
+            if (statusElement) {
+                statusElement.dataset.avariaTop10State = "ready";
+            }
+            refreshAvariaTop10Table();
+        })
+        .catch((error) => {
+            console.error(error);
+            avariaTop10Dataset = [];
+            populateAvariaTop10Table([], avariaTop10Mode);
+            if (statusElement) {
+                statusElement.textContent = "Nao foi possivel carregar os dados.";
+                statusElement.classList.remove("status-message--hidden");
+                statusElement.dataset.avariaTop10State = "error";
+            }
+        });
+}
+
 function normalizeCorteSetoresRows(rows) {
     const safeRows = Array.isArray(rows) ? rows : [];
     const mapped = safeRows.map((row) => {
@@ -905,32 +1253,14 @@ function renderCorteSetoresChart(rows) {
     const gridColor = styles.getPropertyValue("--color-grid").trim() || "rgba(0, 31, 84, 0.08)";
     const textMain = styles.getPropertyValue("--color-text-main").trim() || "#1f2430";
 
-    const highlightGradients = [
-        ["rgba(10, 5, 143, 1)", "rgba(4, 4, 90, 1)"],
-        ["rgba(0, 42, 220, 0.88)", "rgba(0, 31, 84, 0.84)"],
-        ["rgba(0, 42, 220, 0.82)", "rgba(0, 31, 84, 0.78)"],
-        ["rgba(0, 42, 220, 0.76)", "rgba(0, 31, 84, 0.72)"],
-        ["rgba(0, 42, 220, 0.7)", "rgba(0, 31, 84, 0.66)"],
-    ];
-    const highlightBorderPalette = [
-        "rgba(3, 7, 59, 0.98)",
-        "rgba(0, 31, 84, 0.92)",
-        "rgba(0, 31, 84, 0.9)",
-        "rgba(0, 31, 84, 0.88)",
-        "rgba(0, 31, 84, 0.86)",
-    ];
-    const neutralGradient = ["rgba(0, 31, 84, 0.18)", "rgba(0, 31, 84, 0.1)"];
-    const neutralBorderColor = "rgba(0, 31, 84, 0.32)";
-    const neutralBorderHoverColor = "rgba(0, 31, 84, 0.48)";
-    const highlightHoverBorderPalette = [
-        "rgba(12, 5, 112, 1)",
-        "rgba(0, 31, 84, 0.96)",
-        "rgba(0, 31, 84, 0.94)",
-        "rgba(0, 31, 84, 0.92)",
-        "rgba(0, 31, 84, 0.9)",
-    ];
-    const highlightLabelColor = "rgba(0, 31, 84, 0.92)";
-    const neutralLabelColor = "rgba(31, 36, 48, 0.66)";
+    const highlightGradients = SETORES_CHART_HIGHLIGHT_GRADIENTS;
+    const highlightBorderPalette = SETORES_CHART_HIGHLIGHT_BORDER_PALETTE;
+    const neutralGradient = SETORES_CHART_NEUTRAL_GRADIENT;
+    const neutralBorderColor = SETORES_CHART_NEUTRAL_BORDER_COLOR;
+    const neutralBorderHoverColor = SETORES_CHART_NEUTRAL_BORDER_HOVER_COLOR;
+    const highlightHoverBorderPalette = SETORES_CHART_HIGHLIGHT_HOVER_BORDER_PALETTE;
+    const highlightLabelColor = SETORES_CHART_HIGHLIGHT_LABEL_COLOR;
+    const neutralLabelColor = SETORES_CHART_NEUTRAL_LABEL_COLOR;
 
     const toneClassMap = {
         good: "good",
@@ -1042,7 +1372,8 @@ function renderCorteSetoresChart(rows) {
                 }
 
                 ctx.textAlign = textAlign;
-                ctx.fillStyle = index < highlightCount ? highlightLabelColor : neutralLabelColor;
+                const labelColor = index === 0 ? "#ffffff" : index < highlightCount ? highlightLabelColor : neutralLabelColor;
+                ctx.fillStyle = labelColor;
                 ctx.fillText(label, drawX, y);
             });
 
@@ -1163,6 +1494,323 @@ function renderCorteSetoresChart(rows) {
             },
         },
         plugins: [corteSetoresValueLabels],
+    });
+}
+
+function normalizeAvariaSetoresRows(rows) {
+    const safeRows = Array.isArray(rows) ? rows : [];
+    const mapped = safeRows.map((row) => {
+        const labelValue = extractValueFromRow(row, AVARIA_SETORES_LABEL_CANDIDATES);
+        const totalValue = extractValueFromRow(row, AVARIA_SETORES_VALUE_CANDIDATES);
+        const quantityValue = extractValueFromRow(row, AVARIA_SETORES_QUANTITY_CANDIDATES);
+        const numericTotal = parseNumericValue(totalValue);
+        const numericQuantity = parseNumericValue(quantityValue);
+
+        return {
+            label: labelValue !== null && labelValue !== undefined ? String(labelValue) : "",
+            value: Number.isFinite(numericTotal) ? numericTotal : null,
+            rawValue: totalValue,
+            quantity: Number.isFinite(numericQuantity) ? numericQuantity : null,
+            rawQuantity: quantityValue,
+        };
+    });
+
+    const filtered = mapped.filter(
+        (entry) =>
+            entry.label ||
+            Number.isFinite(entry.value) ||
+            Number.isFinite(entry.quantity)
+    );
+    filtered.sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+    return filtered;
+}
+
+function renderAvariaSetoresChart(rows) {
+    const canvasElement = document.getElementById("avariaSetoresChart");
+    if (!canvasElement) {
+        return;
+    }
+
+    if (avariaSetoresChartInstance) {
+        avariaSetoresChartInstance.destroy();
+        avariaSetoresChartInstance = null;
+    }
+
+    removeExistingTooltip(canvasElement);
+
+    if (!Array.isArray(rows) || !rows.length) {
+        const context = canvasElement.getContext("2d");
+        if (context) {
+            const width = canvasElement.width || canvasElement.clientWidth || 0;
+            const height = canvasElement.height || canvasElement.clientHeight || 0;
+            context.clearRect(0, 0, width, height);
+        }
+        return;
+    }
+
+    const topEntries = rows.slice(0, 12);
+    const labels = topEntries.map((entry) => entry.label || "Sem setor");
+    const values = topEntries.map((entry) => (Number.isFinite(entry.value) ? entry.value : 0));
+    const quantities = topEntries.map((entry) => (Number.isFinite(entry.quantity) ? entry.quantity : null));
+    const totalValue = values.reduce((sum, current) => (Number.isFinite(current) ? sum + current : sum), 0);
+
+    const styles = getComputedStyle(document.documentElement);
+    const axisColor = styles.getPropertyValue("--color-axis").trim() || "#7d8597";
+    const gridColor = styles.getPropertyValue("--color-grid").trim() || "rgba(0, 47, 66, 0.08)";
+    const textMain = styles.getPropertyValue("--color-text-main").trim() || "#1f2430";
+
+    const highlightGradients = SETORES_CHART_HIGHLIGHT_GRADIENTS;
+    const highlightBorderPalette = SETORES_CHART_HIGHLIGHT_BORDER_PALETTE;
+    const neutralGradient = SETORES_CHART_NEUTRAL_GRADIENT;
+    const neutralBorderColor = SETORES_CHART_NEUTRAL_BORDER_COLOR;
+    const neutralBorderHoverColor = SETORES_CHART_NEUTRAL_BORDER_HOVER_COLOR;
+    const highlightHoverBorderPalette = SETORES_CHART_HIGHLIGHT_HOVER_BORDER_PALETTE;
+    const highlightLabelColor = SETORES_CHART_HIGHLIGHT_LABEL_COLOR;
+    const neutralLabelColor = SETORES_CHART_NEUTRAL_LABEL_COLOR;
+
+    const toneClassMap = {
+        good: "good",
+        bad: "bad",
+        neutral: "neutral",
+    };
+
+    const createTooltipEntry = (label, value, options = {}) => ({
+        label,
+        value,
+        arrow: options.arrow || "",
+        arrowTone: options.arrowTone || "neutral",
+        valueTone: options.valueTone || "neutral",
+        emphasize: Boolean(options.emphasize),
+        muted: Boolean(options.muted),
+        icon: options.icon || null,
+    });
+
+    const tooltipIcons = {
+        value:
+            '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19h14"></path><path d="M8 19V11"></path><path d="M12 19V7"></path><path d="M16 19V13"></path></svg>',
+        percent:
+            '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 17.5l11-11"></path><circle cx="8.5" cy="8.5" r="2.5"></circle><circle cx="15.5" cy="15.5" r="2.5"></circle></svg>',
+        quantity:
+            '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6" height="6"></rect><rect x="14" y="4" width="6" height="6"></rect><rect x="4" y="14" width="6" height="6"></rect><rect x="14" y="14" width="6" height="6"></rect></svg>',
+    };
+
+    const getEntriesForBar = (index) => {
+        const value = Number.isFinite(values[index]) ? values[index] : 0;
+        const share = totalValue > 0 ? value / totalValue : null;
+        const quantity = Number.isFinite(quantities[index]) ? quantities[index] : null;
+        const entries = [
+            createTooltipEntry("Valor avariado", currencyFormatter.format(value), {
+                emphasize: true,
+                icon: "value",
+            }),
+        ];
+
+        if (share !== null && Number.isFinite(share)) {
+            entries.push(
+                createTooltipEntry("Participação", percentageFormatter.format(share), {
+                    icon: "percent",
+                })
+            );
+        }
+
+        if (quantity !== null) {
+            entries.push(
+                createTooltipEntry("Quantidade", decimalFormatter.format(quantity), {
+                    icon: "quantity",
+                })
+            );
+        }
+
+        entries.push(
+            createTooltipEntry("Posição", `#${index + 1}`, {
+                muted: true,
+            })
+        );
+
+        return entries;
+    };
+
+    const tooltipHelpers = {
+        getEntriesForBar,
+        toneClassMap,
+        icons: tooltipIcons,
+    };
+
+    const highlightCount = Math.min(5, labels.length);
+
+    const createGradient = (ctx, chartArea, stops) => {
+        if (!Array.isArray(stops) || stops.length === 0) {
+            return neutralGradient[0];
+        }
+        if (!chartArea) {
+            return stops[0];
+        }
+        const gradient = ctx.createLinearGradient(chartArea.left, chartArea.top, chartArea.right, chartArea.top);
+        gradient.addColorStop(0, stops[0]);
+        gradient.addColorStop(1, stops[1] || stops[0]);
+        return gradient;
+    };
+
+    const avariaSetoresValueLabels = {
+        id: "avariaSetoresValueLabels",
+        afterDatasetsDraw(chart) {
+            const meta = chart.getDatasetMeta(0);
+            if (!meta) {
+                return;
+            }
+
+            const { ctx } = chart;
+            ctx.save();
+            ctx.textBaseline = "middle";
+            ctx.font = "600 13px Segoe UI, Tahoma";
+
+            meta.data.forEach((barElement, index) => {
+                const value = values[index];
+                if (!barElement || !Number.isFinite(value)) {
+                    return;
+                }
+
+                const { x, y } = barElement.tooltipPosition();
+                const label = currencyFormatter.format(value);
+                const padding = 10;
+                const textWidth = ctx.measureText(label).width;
+                const chartArea = chart.chartArea;
+                const chartRight = chartArea ? chartArea.right - 6 : ctx.canvas.width - 24;
+                let drawX = x + padding;
+                let textAlign = "left";
+
+                if (drawX + textWidth > chartRight) {
+                    drawX = x - padding;
+                    textAlign = "right";
+                }
+
+                if (!Number.isFinite(drawX)) {
+                    drawX = x;
+                }
+
+                ctx.textAlign = textAlign;
+                const labelColor = index === 0 ? "#ffffff" : index < highlightCount ? highlightLabelColor : neutralLabelColor;
+                ctx.fillStyle = labelColor;
+                ctx.fillText(label, drawX, y);
+            });
+
+            ctx.restore();
+        },
+    };
+
+    avariaSetoresChartInstance = new Chart(canvasElement, {
+        type: "bar",
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: "Valor avariado",
+                    data: values,
+                    backgroundColor(context) {
+                        const index = context.dataIndex;
+                        const { chart } = context;
+                        const { ctx, chartArea } = chart;
+                        if (index < highlightCount) {
+                            const paletteIndex = Math.min(index, highlightGradients.length - 1);
+                            const stops = highlightGradients[paletteIndex];
+                            return createGradient(ctx, chartArea, stops);
+                        }
+                        return createGradient(ctx, chartArea, neutralGradient);
+                    },
+                    borderColor(context) {
+                        const index = context.dataIndex;
+                        if (index < highlightCount) {
+                            const paletteIndex = Math.min(index, highlightBorderPalette.length - 1);
+                            return highlightBorderPalette[paletteIndex];
+                        }
+                        return neutralBorderColor;
+                    },
+                    hoverBackgroundColor(context) {
+                        const index = context.dataIndex;
+                        const { chart } = context;
+                        const { ctx, chartArea } = chart;
+                        if (index < highlightCount) {
+                            const paletteIndex = Math.min(index, highlightGradients.length - 1);
+                            const stops = highlightGradients[paletteIndex];
+                            return createGradient(ctx, chartArea, stops);
+                        }
+                        return createGradient(ctx, chartArea, neutralGradient);
+                    },
+                    hoverBorderColor(context) {
+                        const index = context.dataIndex;
+                        if (index < highlightCount) {
+                            const paletteIndex = Math.min(index, highlightHoverBorderPalette.length - 1);
+                            return highlightHoverBorderPalette[paletteIndex];
+                        }
+                        return neutralBorderHoverColor;
+                    },
+                    borderWidth: 1.2,
+                    borderRadius: 2,
+                    borderSkipped: false,
+                    barPercentage: 0.86,
+                    categoryPercentage: 0.76,
+                    maxBarThickness: 44,
+                },
+            ],
+        },
+        options: {
+            indexAxis: "y",
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false,
+                },
+                tooltip: {
+                    enabled: false,
+                    external: (context) => externalTooltipHandler(context, tooltipHelpers),
+                },
+            },
+            layout: {
+                padding: {
+                    top: 12,
+                    bottom: 12,
+                    left: 12,
+                    right: 18,
+                },
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: axisColor,
+                        padding: 6,
+                        callback: (value) => {
+                            const numericValue = Number(value);
+                            return currencyFormatter.format(Number.isFinite(numericValue) ? numericValue : 0);
+                        },
+                        maxTicksLimit: 6,
+                    },
+                    grid: {
+                        color: gridColor,
+                        drawBorder: false,
+                        lineWidth: 0.6,
+                    },
+                },
+                y: {
+                    ticks: {
+                        color: textMain,
+                        padding: 8,
+                        font: {
+                            size: 12,
+                            weight: "600",
+                        },
+                    },
+                    grid: {
+                        display: false,
+                    },
+                    border: {
+                        display: false,
+                    },
+                },
+            },
+        },
+        plugins: [avariaSetoresValueLabels],
     });
 }
 
@@ -1346,6 +1994,232 @@ function handleCorteTop10ToggleChange() {
     refreshCorteTop10Table();
 }
 
+function normalizeAvariaTop10Rows(payload) {
+    const columns = Array.isArray(payload?.columns) ? payload.columns : [];
+    const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+    const safeRows = Array.isArray(rows) ? rows : [];
+
+    const columnRefs = {
+        item: findColumnByCandidates(columns, AVARIA_TOP10_ITEM_CANDIDATES),
+        description: findColumnByCandidates(columns, AVARIA_TOP10_DESCRIPTION_CANDIDATES),
+        value: findColumnByCandidates(columns, AVARIA_TOP10_VALUE_CANDIDATES),
+        quantity: findColumnByCandidates(columns, AVARIA_TOP10_QUANTITY_CANDIDATES),
+    };
+
+    const mapped = safeRows.map((row) => {
+        const itemValue = columnRefs.item && row ? row[columnRefs.item] : extractValueFromRow(row, AVARIA_TOP10_ITEM_CANDIDATES);
+        const descriptionValue =
+            columnRefs.description && row
+                ? row[columnRefs.description]
+                : extractValueFromRow(row, AVARIA_TOP10_DESCRIPTION_CANDIDATES);
+        const totalValue = columnRefs.value && row ? row[columnRefs.value] : extractValueFromRow(row, AVARIA_TOP10_VALUE_CANDIDATES);
+        const quantityValue =
+            columnRefs.quantity && row
+                ? row[columnRefs.quantity]
+                : extractValueFromRow(row, AVARIA_TOP10_QUANTITY_CANDIDATES);
+
+        const numericTotal = parseNumericValue(totalValue);
+        const numericQuantity = parseNumericValue(quantityValue);
+
+        return {
+            item: itemValue !== null && itemValue !== undefined ? String(itemValue) : "",
+            description: descriptionValue !== null && descriptionValue !== undefined ? String(descriptionValue) : "",
+            value: Number.isFinite(numericTotal) ? numericTotal : null,
+            rawValue: totalValue,
+            quantity: Number.isFinite(numericQuantity) ? numericQuantity : null,
+            rawQuantity: quantityValue,
+        };
+    });
+
+    return mapped.filter(
+        (entry) =>
+            entry.item ||
+            entry.description ||
+            Number.isFinite(entry.value) ||
+            Number.isFinite(entry.quantity)
+    );
+}
+
+function populateAvariaTop10Table(entries, mode = "value") {
+    if (!avariaTop10TableBody) {
+        return;
+    }
+
+    const safeEntries = Array.isArray(entries) ? entries : [];
+
+    if (!safeEntries.length) {
+        avariaTop10TableBody.innerHTML = '<tr class="avaria-top10-table__empty"><td colspan="3">Sem dados disponíveis</td></tr>';
+        return;
+    }
+
+    avariaTop10TableBody.innerHTML = "";
+
+    safeEntries.forEach((entry, index) => {
+        const tableRow = document.createElement("tr");
+        tableRow.className = "avaria-top10-table__row";
+        if (index < 3) {
+            tableRow.classList.add("is-highlight");
+        }
+
+        const itemCell = document.createElement("td");
+        itemCell.className = "avaria-top10-table__cell avaria-top10-table__cell--item";
+        const itemWrapper = document.createElement("div");
+        itemWrapper.className = "avaria-top10-table__item";
+
+        const rankBadge = document.createElement("span");
+        rankBadge.className = "avaria-top10-table__rank-badge";
+        rankBadge.textContent = String(index + 1);
+
+        const itemLabel = document.createElement("span");
+        itemLabel.className = "avaria-top10-table__item-label";
+        itemLabel.textContent = entry.item || "Sem item";
+        if (entry.item) {
+            itemLabel.title = entry.item;
+        }
+
+        itemWrapper.appendChild(rankBadge);
+        itemWrapper.appendChild(itemLabel);
+        itemCell.appendChild(itemWrapper);
+
+        const descriptionCell = document.createElement("td");
+        descriptionCell.className = "avaria-top10-table__cell avaria-top10-table__cell--description";
+        descriptionCell.textContent = entry.description || "Descrição não informada";
+        if (entry.description) {
+            descriptionCell.title = entry.description;
+        }
+
+        const valorCell = document.createElement("td");
+        valorCell.className = "avaria-top10-table__cell avaria-top10-table__cell--valor";
+        if (mode === "quantity") {
+            if (Number.isFinite(entry.quantity)) {
+                valorCell.textContent = decimalFormatter.format(entry.quantity);
+                if (Number.isFinite(entry.value)) {
+                    valorCell.title = `${decimalFormatter.format(entry.quantity)} unidades · ${currencyFormatter.format(entry.value)}`;
+                }
+            } else if (entry.rawQuantity !== null && entry.rawQuantity !== undefined && entry.rawQuantity !== "") {
+                valorCell.textContent = String(entry.rawQuantity);
+            } else {
+                valorCell.textContent = "—";
+            }
+        } else if (Number.isFinite(entry.value)) {
+            valorCell.textContent = currencyFormatter.format(entry.value);
+            if (Number.isFinite(entry.quantity)) {
+                valorCell.title = `${currencyFormatter.format(entry.value)} · ${decimalFormatter.format(entry.quantity)} unidades`;
+            }
+        } else if (entry.rawValue !== null && entry.rawValue !== undefined && entry.rawValue !== "") {
+            valorCell.textContent = String(entry.rawValue);
+        } else {
+            valorCell.textContent = "—";
+        }
+
+        tableRow.appendChild(itemCell);
+        tableRow.appendChild(descriptionCell);
+        tableRow.appendChild(valorCell);
+        avariaTop10TableBody.appendChild(tableRow);
+    });
+}
+
+function getAvariaTop10EntriesForMode(mode) {
+    const safeMode = mode === "quantity" ? "quantity" : "value";
+    const source = Array.isArray(avariaTop10Dataset) ? avariaTop10Dataset : [];
+
+    if (!source.length) {
+        return [];
+    }
+
+    const getScore = (entry) => (safeMode === "quantity" ? entry.quantity : entry.value);
+    const numericEntries = source
+        .filter((entry) => Number.isFinite(getScore(entry)))
+        .sort((a, b) => getScore(b) - getScore(a));
+
+    if (numericEntries.length >= 10) {
+        return numericEntries.slice(0, 10);
+    }
+
+    const usedEntries = new Set(numericEntries);
+    const fallbackEntries = source.filter((entry) => {
+        if (usedEntries.has(entry)) {
+            return false;
+        }
+
+        if (safeMode === "quantity") {
+            if (entry.rawQuantity !== null && entry.rawQuantity !== undefined && entry.rawQuantity !== "") {
+                return true;
+            }
+        } else if (entry.rawValue !== null && entry.rawValue !== undefined && entry.rawValue !== "") {
+            return true;
+        }
+
+        return Boolean(entry.item || entry.description);
+    });
+
+    return numericEntries.concat(fallbackEntries).slice(0, 10);
+}
+
+function refreshAvariaTop10Table() {
+    const rankedEntries = getAvariaTop10EntriesForMode(avariaTop10Mode);
+    populateAvariaTop10Table(rankedEntries, avariaTop10Mode);
+    updateAvariaTop10StatusMessage(rankedEntries);
+    return rankedEntries;
+}
+
+function handleAvariaTop10ToggleChange() {
+    const isQuantityMode = Boolean(avariaTop10Toggle?.checked);
+    avariaTop10Mode = isQuantityMode ? "quantity" : "value";
+    updateAvariaTop10ToggleAria();
+    updateAvariaTop10ColumnHeader();
+    refreshAvariaTop10Table();
+}
+
+function updateAvariaTop10ColumnHeader() {
+    if (avariaTop10HeaderLabel) {
+        avariaTop10HeaderLabel.textContent = avariaTop10Mode === "quantity" ? "Qtd. avariada" : "Valor avariado";
+    }
+
+    if (avariaTop10HeaderIcon) {
+        avariaTop10HeaderIcon.textContent = avariaTop10Mode === "quantity" ? "inventory" : "savings";
+    }
+}
+
+function updateAvariaTop10ToggleAria() {
+    if (!avariaTop10Toggle) {
+        return;
+    }
+
+    const isQuantityMode = Boolean(avariaTop10Toggle.checked);
+    const toggleLabel = isQuantityMode
+        ? "Exibindo ranking por quantidade avariada"
+        : "Exibindo ranking por valor avariado";
+    avariaTop10Toggle.setAttribute("aria-label", toggleLabel);
+
+    const switchContainer = avariaTop10Toggle.closest(".switch");
+    if (switchContainer) {
+        const actionLabel = isQuantityMode
+            ? "Alternar para ranking por valor avariado"
+            : "Alternar para ranking por quantidade avariada";
+        switchContainer.setAttribute("aria-label", actionLabel);
+    }
+}
+
+function updateAvariaTop10StatusMessage(entries) {
+    if (!avariaTop10StatusDOM) {
+        return;
+    }
+
+    const state = avariaTop10StatusDOM.dataset.avariaTop10State;
+    if (state !== "ready") {
+        return;
+    }
+
+    if (Array.isArray(entries) && entries.length) {
+        avariaTop10StatusDOM.textContent = "";
+        avariaTop10StatusDOM.classList.add("status-message--hidden");
+    } else {
+        avariaTop10StatusDOM.textContent = "Sem dados disponíveis.";
+        avariaTop10StatusDOM.classList.remove("status-message--hidden");
+    }
+}
+
 function updateCorteTop10ColumnHeader() {
     if (corteTop10HeaderLabel) {
         corteTop10HeaderLabel.textContent = corteTop10Mode === "quantity" ? "Qtd. cortada" : "Valor cortado";
@@ -1405,6 +2279,8 @@ function loadInventarioDataset(statusElement) {
         })
         .then((payload) => {
             renderInventarioValoresCard(payload?.valores);
+            renderInventarioCanceladosSection(payload?.cancelados);
+            renderInventarioCanceladosMotives(payload?.cancelados_motivos);
             const dataset = prepareInventarioDataset(payload);
             inventarioDatasetCache = dataset;
             renderInventarioChart(dataset);
@@ -1422,6 +2298,7 @@ function loadInventarioDataset(statusElement) {
                 inventarioChartInstance = null;
             }
             resetInventarioValoresCard();
+            resetInventarioCanceladosSection({ errorMessage: "Nao foi possivel carregar os cancelamentos." });
             updateInventarioMetrics();
             if (statusElement) {
                 statusElement.textContent = "Nao foi possivel carregar os dados.";
@@ -1900,6 +2777,551 @@ function renderInventarioValoresCard(valoresPayload) {
     setFieldValue(dom.valorAbsoluto, summary.valorAbsoluto, "currency");
     setFieldValue(dom.valorModular, summary.valorModular, "currency");
     setFieldValue(dom.percentualAjuste, summary.percentualAjuste, "percent");
+}
+
+function collectInventarioCanceladosElements() {
+    const card = document.querySelector("[data-inventario-cancelados]");
+    if (!card) {
+        return null;
+    }
+
+    return {
+        card,
+        canvas: card.querySelector("#inventarioCanceladosChart"),
+        status: card.querySelector('[data-status="inventario-cancelados"]'),
+        empty: card.querySelector('[data-inventario-cancelados-empty]'),
+        legendList: card.querySelector('[data-inventario-cancelados-legend-list]'),
+        legendEmpty: card.querySelector('[data-inventario-cancelados-legend-empty]'),
+        total: card.querySelector('[data-inventario-cancelados-total]'),
+        motivesList: card.querySelector('[data-inventario-cancelados-motives-list]'),
+        motivesEmpty: card.querySelector('[data-inventario-cancelados-motives-empty]'),
+    };
+}
+
+function resetInventarioCanceladosSection({ errorMessage = null, preserveMotives = false } = {}) {
+    if (!inventarioCanceladosDOM) {
+        inventarioCanceladosDOM = collectInventarioCanceladosElements();
+    }
+
+    const dom = inventarioCanceladosDOM;
+    if (!dom) {
+        return;
+    }
+
+    if (inventarioCanceladosChartInstance) {
+        inventarioCanceladosChartInstance.destroy();
+        inventarioCanceladosChartInstance = null;
+    }
+
+    if (dom.total) {
+        dom.total.textContent = "—";
+    }
+
+    if (dom.legendList) {
+        dom.legendList
+            .querySelectorAll(".inventario-cancelados-card__legend-item")
+            .forEach((item) => item.remove());
+    }
+
+    if (dom.legendEmpty) {
+        dom.legendEmpty.hidden = Boolean(errorMessage);
+    }
+
+    if (dom.empty) {
+        if (errorMessage) {
+            dom.empty.hidden = true;
+        } else {
+            dom.empty.hidden = false;
+            dom.empty.textContent = "Sem cancelamentos registrados.";
+        }
+    }
+
+    if (dom.status) {
+        if (errorMessage) {
+            dom.status.textContent = errorMessage;
+            dom.status.classList.remove("status-message--hidden");
+        } else {
+            dom.status.textContent = "";
+            dom.status.classList.add("status-message--hidden");
+        }
+    }
+
+    if (!preserveMotives) {
+        resetInventarioCanceladosMotives({ errorMessage });
+    }
+}
+
+function resetInventarioCanceladosMotives({ errorMessage = null } = {}) {
+    if (!inventarioCanceladosDOM) {
+        inventarioCanceladosDOM = collectInventarioCanceladosElements();
+    }
+
+    const dom = inventarioCanceladosDOM;
+    if (!dom || !dom.motivesList) {
+        return;
+    }
+
+    dom.motivesList
+        .querySelectorAll(".inventario-cancelados-card__motives-item")
+        .forEach((item) => item.remove());
+
+    if (dom.motivesEmpty) {
+        dom.motivesEmpty.hidden = false;
+        dom.motivesEmpty.textContent = errorMessage || "Sem motivos disponíveis";
+    }
+}
+
+function prepareInventarioCanceladosSummary(payload) {
+    const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+    if (!rows.length) {
+        return { entries: [], total: 0 };
+    }
+
+    const columns = Array.isArray(payload?.columns) && payload.columns.length
+        ? payload.columns
+        : Object.keys(rows[0] ?? {});
+
+    if (!columns.length) {
+        return { entries: [], total: 0 };
+    }
+
+    const reasonColumn = findColumnByCandidates(columns, INVENTARIO_CANCELADOS_REASON_CANDIDATES);
+    const valueColumn = findColumnByCandidates(columns, INVENTARIO_CANCELADOS_VALUE_CANDIDATES);
+
+    if (!valueColumn) {
+        return { entries: [], total: 0 };
+    }
+
+    const aggregated = new Map();
+
+    rows.forEach((row, index) => {
+        if (!row) {
+            return;
+        }
+
+        const rawReason = reasonColumn ? row[reasonColumn] : null;
+        let label = rawReason === null || rawReason === undefined || rawReason === ""
+            ? "Sem motivo"
+            : String(rawReason).trim();
+        if (!label) {
+            label = `Motivo ${index + 1}`;
+        }
+
+        const numericValue = parseNumericValue(row[valueColumn]);
+        if (!Number.isFinite(numericValue) || numericValue <= 0) {
+            return;
+        }
+
+        const key = normalizeKeyName(label) || `motivo-${index}`;
+        const entry = aggregated.get(key);
+        if (entry) {
+            entry.value += numericValue;
+        } else {
+            aggregated.set(key, { label, value: numericValue });
+        }
+    });
+
+    const entries = Array.from(aggregated.values()).filter((entry) => Number.isFinite(entry.value) && entry.value > 0);
+    if (!entries.length) {
+        return { entries: [], total: 0 };
+    }
+
+    entries.sort((a, b) => b.value - a.value);
+
+    const overallTotal = entries.reduce((sum, entry) => sum + entry.value, 0);
+    if (!(overallTotal > 0)) {
+        return { entries: [], total: 0 };
+    }
+
+    const maxSegments = Math.max(3, INVENTARIO_CANCELADOS_MAX_SEGMENTS);
+    let limitedEntries = entries;
+
+    if (entries.length > maxSegments) {
+        const topEntries = entries.slice(0, maxSegments - 1);
+        const remainder = entries.slice(maxSegments - 1).reduce((sum, entry) => sum + entry.value, 0);
+        limitedEntries = remainder > 0 ? [...topEntries, { label: "Outros", value: remainder }] : topEntries;
+    }
+
+    const normalizedEntries = limitedEntries.map((entry) => ({
+        label: entry.label,
+        value: entry.value,
+        share: entry.value / overallTotal,
+    }));
+
+    return {
+        total: overallTotal,
+        entries: normalizedEntries,
+    };
+}
+
+function prepareInventarioCanceladosMotivesSummary(payload) {
+    const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+    if (!rows.length) {
+        return [];
+    }
+
+    const columns = Array.isArray(payload?.columns) && payload.columns.length
+        ? payload.columns
+        : Object.keys(rows[0] ?? {});
+
+    if (!columns.length) {
+        return [];
+    }
+
+    const motiveColumn = findColumnByCandidates(columns, INVENTARIO_CANCELADOS_MOTIVE_CANDIDATES);
+    if (!motiveColumn) {
+        return [];
+    }
+    const observationColumn = findColumnByCandidates(columns, INVENTARIO_CANCELADOS_OBSERVATION_CANDIDATES);
+
+    const aggregated = new Map();
+
+    rows.forEach((row, index) => {
+        if (!row) {
+            return;
+        }
+
+        const rawMotive = row[motiveColumn];
+        if (rawMotive === null || rawMotive === undefined) {
+            return;
+        }
+
+        const motiveText = String(rawMotive).trim();
+        if (!motiveText) {
+            return;
+        }
+
+        const key = normalizeKeyName(motiveText) || `motivo-${index}`;
+        const existing = aggregated.get(key);
+
+        let noteText = null;
+        if (observationColumn && observationColumn in row) {
+            const rawObservation = row[observationColumn];
+            if (rawObservation !== null && rawObservation !== undefined) {
+                const normalizedObservation = String(rawObservation).trim();
+                if (normalizedObservation) {
+                    noteText = normalizedObservation;
+                }
+            }
+        }
+
+        if (existing) {
+            if (!existing.observation && noteText) {
+                existing.observation = noteText;
+            }
+        } else {
+            aggregated.set(key, {
+                label: motiveText,
+                observation: noteText || "",
+            });
+        }
+    });
+
+    const entries = Array.from(aggregated.values());
+    entries.sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }));
+    return entries;
+}
+
+function renderInventarioCanceladosMotives(motivosPayload) {
+    if (!inventarioCanceladosDOM) {
+        inventarioCanceladosDOM = collectInventarioCanceladosElements();
+    }
+
+    const dom = inventarioCanceladosDOM;
+    if (!dom || !dom.motivesList) {
+        return;
+    }
+
+    dom.motivesList
+        .querySelectorAll(".inventario-cancelados-card__motives-item")
+        .forEach((item) => item.remove());
+
+    const entries = prepareInventarioCanceladosMotivesSummary(motivosPayload);
+
+    if (!entries.length) {
+        if (dom.motivesEmpty) {
+            dom.motivesEmpty.hidden = false;
+            dom.motivesEmpty.textContent = "Sem motivos disponíveis";
+        }
+        return;
+    }
+
+    entries.forEach((entry) => {
+        const listItem = document.createElement("li");
+        listItem.className = "inventario-cancelados-card__motives-item";
+
+        const marker = document.createElement("span");
+        marker.className = "inventario-cancelados-card__motives-marker";
+        marker.setAttribute("aria-hidden", "true");
+        listItem.appendChild(marker);
+
+        const content = document.createElement("div");
+        content.className = "inventario-cancelados-card__motives-content";
+
+        const labelElement = document.createElement("span");
+        labelElement.className = "inventario-cancelados-card__motives-label";
+        labelElement.textContent = entry.label;
+        content.appendChild(labelElement);
+
+        if (entry.observation) {
+            const noteElement = document.createElement("span");
+            noteElement.className = "inventario-cancelados-card__motives-note";
+            noteElement.textContent = entry.observation;
+            content.appendChild(noteElement);
+        }
+
+        listItem.appendChild(content);
+        dom.motivesList.appendChild(listItem);
+    });
+
+    if (dom.motivesEmpty) {
+        dom.motivesEmpty.hidden = true;
+    }
+}
+
+function buildInventarioCanceladosPalette(count) {
+    if (!Number.isFinite(count) || count <= 0) {
+        return [];
+    }
+
+    if (count <= INVENTARIO_CANCELADOS_COLOR_PALETTE.length) {
+        return INVENTARIO_CANCELADOS_COLOR_PALETTE.slice(0, count);
+    }
+
+    const colors = [];
+    for (let index = 0; index < count; index += 1) {
+        colors.push(INVENTARIO_CANCELADOS_COLOR_PALETTE[index % INVENTARIO_CANCELADOS_COLOR_PALETTE.length]);
+    }
+    return colors;
+}
+
+function renderInventarioCanceladosLegend(entries, colors) {
+    if (!inventarioCanceladosDOM) {
+        inventarioCanceladosDOM = collectInventarioCanceladosElements();
+    }
+
+    const dom = inventarioCanceladosDOM;
+    if (!dom || !dom.legendList) {
+        return;
+    }
+
+    dom.legendList
+        .querySelectorAll(".inventario-cancelados-card__legend-item")
+        .forEach((item) => item.remove());
+
+    if (!Array.isArray(entries) || !entries.length) {
+        if (dom.legendEmpty) {
+            dom.legendEmpty.hidden = false;
+        }
+        return;
+    }
+
+    entries.forEach((entry, index) => {
+        const color = colors[index % colors.length] || INVENTARIO_CANCELADOS_COLOR_PALETTE[0];
+        const listItem = document.createElement("li");
+        listItem.className = "inventario-cancelados-card__legend-item";
+
+        const labelWrap = document.createElement("span");
+        labelWrap.className = "inventario-cancelados-card__legend-label";
+
+        const colorSwatch = document.createElement("span");
+        colorSwatch.className = "inventario-cancelados-card__legend-color";
+        colorSwatch.style.setProperty("--legend-color", color);
+        labelWrap.appendChild(colorSwatch);
+
+        const labelText = document.createElement("span");
+        labelText.textContent = entry.label;
+        labelWrap.appendChild(labelText);
+
+        const valuesWrap = document.createElement("span");
+        valuesWrap.className = "inventario-cancelados-card__legend-values";
+
+        const valueAmount = document.createElement("span");
+        valueAmount.className = "inventario-cancelados-card__legend-amount";
+        valueAmount.textContent = currencyFormatter.format(entry.value);
+        valuesWrap.appendChild(valueAmount);
+
+        const valueShare = document.createElement("span");
+        valueShare.className = "inventario-cancelados-card__legend-share";
+        valueShare.textContent = percentageFormatter.format(entry.share || 0);
+        valuesWrap.appendChild(valueShare);
+
+        listItem.append(labelWrap, valuesWrap);
+        dom.legendList.appendChild(listItem);
+    });
+
+    if (dom.legendEmpty) {
+        dom.legendEmpty.hidden = true;
+    }
+}
+
+function renderInventarioCanceladosSection(canceladosPayload) {
+    if (!inventarioCanceladosDOM) {
+        inventarioCanceladosDOM = collectInventarioCanceladosElements();
+    }
+
+    const dom = inventarioCanceladosDOM;
+    if (!dom) {
+        return;
+    }
+
+    const summary = prepareInventarioCanceladosSummary(canceladosPayload);
+    if (!summary.entries.length) {
+        resetInventarioCanceladosSection();
+        return;
+    }
+
+    if (dom.status) {
+        dom.status.textContent = "";
+        dom.status.classList.add("status-message--hidden");
+    }
+
+    if (dom.empty) {
+        dom.empty.hidden = true;
+    }
+
+    if (dom.legendEmpty) {
+        dom.legendEmpty.hidden = true;
+    }
+
+    if (dom.total) {
+        dom.total.textContent = currencyFormatter.format(summary.total);
+    }
+
+    const colors = buildInventarioCanceladosPalette(summary.entries.length);
+    const labels = summary.entries.map((entry) => entry.label);
+    const values = summary.entries.map((entry) => entry.value);
+    const shares = summary.entries.map((entry) => entry.share);
+
+    if (inventarioCanceladosChartInstance) {
+        inventarioCanceladosChartInstance.destroy();
+        inventarioCanceladosChartInstance = null;
+    }
+
+    if (!dom.canvas) {
+        renderInventarioCanceladosLegend(summary.entries, colors);
+        return;
+    }
+
+    removeExistingTooltip(dom.canvas);
+
+    const context = dom.canvas.getContext("2d");
+    if (!context) {
+        renderInventarioCanceladosLegend(summary.entries, colors);
+        return;
+    }
+
+    const hoverColors = colors.map((color) => adjustHexColor(color, 0.2));
+    const formattedTotal = summary.total > 0 ? currencyFormatter.format(summary.total) : null;
+    const sliceSpacing = summary.entries.length >= 4 ? 4 : 6;
+
+    const tooltipIcons = {
+        value:
+            '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20h14"></path><path d="M12 4v16"></path><path d="M8 10v10"></path><path d="M16 14v6"></path></svg>',
+        share:
+            '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12.9c1.7-3.2 5.4-5.3 9.6-4.8"></path><path d="M6 12.9L4 9"></path><path d="M6 12.9L9.9 11"></path><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle></svg>',
+        total:
+            '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18"></path><path d="M3 10h18"></path><path d="M3 16h12"></path><path d="M3 22h6"></path></svg>',
+    };
+
+    const tooltipHelpers = {
+        toneClassMap: {
+            good: "good",
+            bad: "bad",
+            neutral: "neutral",
+        },
+        icons: tooltipIcons,
+        getEntriesForBar(index) {
+            const safeIndex = Number.isFinite(index) ? index : 0;
+            const value = Number.isFinite(values[safeIndex]) ? values[safeIndex] : 0;
+            const share = Number.isFinite(shares[safeIndex]) ? shares[safeIndex] : 0;
+
+            const entries = [
+                {
+                    label: "Valor cancelado",
+                    value: currencyFormatter.format(value),
+                    icon: "value",
+                    emphasize: true,
+                },
+                {
+                    label: "Participação",
+                    value: percentageFormatter.format(share),
+                    icon: "share",
+                },
+            ];
+
+            if (formattedTotal) {
+                entries.push({
+                    label: "Total geral",
+                    value: formattedTotal,
+                    icon: "total",
+                    muted: true,
+                });
+            }
+
+            return entries;
+        },
+        getEntriesForLine() {
+            return [];
+        },
+    };
+
+    inventarioCanceladosChartInstance = new Chart(context, {
+        type: "pie",
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: "Valor cancelado",
+                    data: values,
+                    backgroundColor: colors,
+                    hoverBackgroundColor: hoverColors,
+                    borderColor: "rgba(255, 255, 255, 0.95)",
+                    hoverBorderColor: "rgba(255, 255, 255, 0.95)",
+                    borderWidth: 2,
+                    spacing: sliceSpacing,
+                    borderRadius: 8,
+                    hoverOffset: 18,
+                    offset: 2,
+                    clip: false,
+                    _inventarioShares: shares,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: {
+                padding: 10,
+            },
+            animation: {
+                animateRotate: true,
+                animateScale: true,
+                duration: 820,
+                easing: "easeOutQuart",
+            },
+            plugins: {
+                legend: {
+                    display: false,
+                },
+                tooltip: {
+                    enabled: false,
+                    external: (tooltipContext) => externalTooltipHandler(tooltipContext, tooltipHelpers),
+                },
+                inventarioCanceladosPieLabels: {
+                    minShare: summary.entries.length > 6 ? 0.045 : 0.03,
+                },
+                inventarioCanceladosPieShadow: {
+                    shadowColor: "rgba(3, 22, 75, 0.18)",
+                    shadowBlur: 28,
+                    shadowOffsetY: 16,
+                },
+            },
+        },
+        plugins: [INVENTARIO_CANCELADOS_PIE_SHADOW_PLUGIN, INVENTARIO_CANCELADOS_PIE_LABELS_PLUGIN],
+    });
+
+    renderInventarioCanceladosLegend(summary.entries, colors);
 }
 
 function getInventarioChartElements() {

@@ -49,10 +49,13 @@ DATA_SHEET_CORTE_SETORES = "Corte-setores"
 DATA_SHEET_CORTE_TOP10 = "Corte-top10"
 DATA_SHEET_INVENTARIO = "Inventario"
 DATA_SHEET_INVENTARIO_2 = "Inventario - Valores"
+DATA_SHEET_INVENTARIO_CANCELADO = "Inventario - Cancelados"
+DATA_SHEET_INVENTARIO_MOTIVO_CANCELADO = "Inventario - Cancelados Motivo"
 DATA_SHEET_FUNNEL = "Funnel"
 DATA_SHEET_SENHA_167 = "Senha 167"
 DATA_SHEET_SENHA_171 = "Senha 171"
-
+DATA_SHEET_AVARIA_SETORES = "Avaria - Setores"
+DATA_SHEET_AVARIA_ITENS = "Avaria - Itens"
 
 def LoadData(file_path, sheet_name):
     try:
@@ -85,6 +88,19 @@ def convert_percentage(valor):
         return valor_float
     except ValueError:
         return 0.0
+
+
+def convert_integer(valor):
+    try:
+        if isinstance(valor, str):
+            cleaned = valor.replace(".", "").replace(",", ".").strip()
+            if cleaned == "":
+                return 0
+            return int(float(cleaned))
+        return int(valor)
+    except (ValueError, TypeError):
+        return 0
+
 
 def ProcessData(data):
     try:
@@ -303,6 +319,111 @@ def load_inventario_valores_dataframe():
     return dataframe
 
 
+def load_inventario_cancelado_dataframe():
+    dataframe = _load_sheet(DATA_SHEET_INVENTARIO_CANCELADO)
+    if dataframe is None:
+        return None
+    dataframe = dataframe.copy()
+
+    try:
+        if "Motivo de Cancelamento" in dataframe.columns:
+            dataframe["Motivo de Cancelamento"] = dataframe["Motivo de Cancelamento"].astype(str)
+
+        if "Quantidade cancelado" in dataframe.columns:
+            dataframe["Quantidade cancelado"] = dataframe["Quantidade cancelado"].apply(convert_integer)
+
+        if "Valor cancelado" in dataframe.columns:
+            dataframe["Valor cancelado"] = dataframe["Valor cancelado"].apply(converter_valor)
+    except Exception as error:
+        print(f"An error occurred while processing the Inventario Cancelado data: {error}")
+
+    return dataframe
+
+
+def load_inventario_motivo_cancelado_dataframe():
+    dataframe = _load_sheet(DATA_SHEET_INVENTARIO_MOTIVO_CANCELADO)
+    if dataframe is None:
+        return None
+    dataframe = dataframe.copy()
+
+    try:
+        if "Motivos" in dataframe.columns:
+            dataframe["Motivos"] = dataframe["Motivos"].astype(str)
+
+        if "Observação" in dataframe.columns:
+            dataframe["Observação"] = dataframe["Observação"].astype(str)
+    except Exception as error:
+        print(f"An error occurred while processing the Inventario Motivo Cancelado data: {error}")
+
+    return dataframe
+
+
+def load_avaria_setores_dataframe():
+    dataframe = _load_sheet(DATA_SHEET_AVARIA_SETORES)
+    if dataframe is None:
+        return None
+    dataframe = dataframe.copy()
+
+    try:
+        if "Setores" in dataframe.columns:
+            dataframe["Setores"] = dataframe["Setores"].astype(str)
+
+        if "Valor Avariado" in dataframe.columns:
+            dataframe["Valor Avariado"] = dataframe["Valor Avariado"].apply(converter_valor)
+
+        if "Quantidade" in dataframe.columns:
+            dataframe["Quantidade"] = dataframe["Quantidade"].apply(convert_integer)
+
+    except Exception as error:
+        print(f"An error occurred while processing the Avaria Setores data: {error}")
+
+    return dataframe
+
+
+def load_avaria_itens_dataframe():
+    dataframe = _load_sheet(DATA_SHEET_AVARIA_ITENS)
+    if dataframe is None:
+        return None
+    dataframe = dataframe.copy()
+
+    try:
+        if "ITEM" in dataframe.columns:
+            dataframe["ITEM"] = dataframe["ITEM"].astype(str)
+
+        if "DESCRIÇÃO DO ITEM" in dataframe.columns:
+            dataframe["DESCRIÇÃO DO ITEM"] = dataframe["DESCRIÇÃO DO ITEM"].astype(str)
+
+        if "Valor" in dataframe.columns:
+            dataframe["Valor"] = dataframe["Valor"].apply(converter_valor)
+
+        if "Quantidade" in dataframe.columns:
+            dataframe["Quantidade"] = dataframe["Quantidade"].apply(convert_integer)
+    except Exception as error:
+        print(f"An error occurred while processing the Avaria Itens data: {error}")
+
+    return dataframe
+
+
+@app.route("/api/avaria/setores", methods=["GET"])
+def get_avaria_setores():
+    dataframe = load_avaria_setores_dataframe()
+    if dataframe is None or dataframe.empty:
+        return jsonify({"error": "Dados indisponiveis"}), 500
+
+    payload = _serialize_dataframe(dataframe)
+    return jsonify(payload)
+
+
+@app.route("/api/avaria/top10", methods=["GET"])
+def get_avaria_top10():
+    dataframe = load_avaria_itens_dataframe()
+    if dataframe is None or dataframe.empty:
+        return jsonify({"error": "Dados indisponiveis"}), 500
+
+    payload = _serialize_dataframe(dataframe)
+    return jsonify(payload)
+
+
 def load_funnel_dataframe():
     dataframe = _load_sheet(DATA_SHEET_FUNNEL)
     if dataframe is None:
@@ -484,6 +605,12 @@ def get_inventario():
     valores_dataframe = load_inventario_valores_dataframe()
     if valores_dataframe is not None and not valores_dataframe.empty:
         payload["valores"] = _serialize_dataframe(valores_dataframe)
+    cancelado_dataframe = load_inventario_cancelado_dataframe()
+    if cancelado_dataframe is not None and not cancelado_dataframe.empty:
+        payload["cancelados"] = _serialize_dataframe(cancelado_dataframe)
+    motivo_cancelado_dataframe = load_inventario_motivo_cancelado_dataframe()
+    if motivo_cancelado_dataframe is not None and not motivo_cancelado_dataframe.empty:
+        payload["cancelados_motivos"] = _serialize_dataframe(motivo_cancelado_dataframe)
     return jsonify(payload)
 
 

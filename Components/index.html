@@ -27,7 +27,7 @@
 				</button>
 				<button type="button" class="dashboard__tab" role="tab" aria-selected="false" aria-controls="slide-avaria" data-slide-target="avaria" tabindex="-1">
 					<span class="dashboard__tab-icon material-symbols-rounded" aria-hidden="true">handyman</span>
-					<span class="dashboard__tab-label">Avaria - Recuperados</span>
+					<span class="dashboard__tab-label">Avaria - Avariados</span>
 				</button>
 				<button type="button" class="dashboard__tab" role="tab" aria-selected="false" aria-controls="slide-funnel" data-slide-target="funnel" tabindex="-1">
 					<span class="dashboard__tab-icon material-symbols-rounded" aria-hidden="true">filter_alt</span>
@@ -505,10 +505,36 @@
 						</div>
 					</div>
 				</section>
-				<section class="chart-card chart-card--placeholder panel-view panel-view--secondary" data-inventario-cancelados aria-hidden="true" aria-live="polite">
-					<div class="chart-card__placeholder">
-						<h2 class="chart-card__placeholder-title">Em breve</h2>
-						<p class="chart-card__placeholder-text">Esta seção apresentará o Inventário cancelados em uma próxima atualização.</p>
+				<section class="chart-card inventario-cancelados-card panel-view panel-view--secondary" data-inventario-cancelados aria-hidden="true" aria-live="polite">
+					<header class="inventario-cancelados-card__header">
+						<div class="inventario-cancelados-card__title-group">
+							<span class="material-symbols-rounded inventario-cancelados-card__icon" aria-hidden="true">donut_small</span>
+							<h2 class="inventario-cancelados-card__title">Inventário cancelados por motivo</h2>
+						</div>
+						<div class="inventario-cancelados-card__total" aria-live="polite">
+							<span class="inventario-cancelados-card__total-label">Total cancelado</span>
+							<span class="inventario-cancelados-card__total-value" data-inventario-cancelados-total>&mdash;</span>
+						</div>
+					</header>
+					<div class="inventario-cancelados-card__content">
+						<div class="inventario-cancelados-card__chart" role="presentation">
+							<p class="status-message" data-status="inventario-cancelados">Carregando cancelamentos...</p>
+							<canvas id="inventarioCanceladosChart" role="img" aria-label="Distribuição do valor cancelado por motivo"></canvas>
+							<p class="inventario-cancelados-card__empty" data-inventario-cancelados-empty hidden>Sem cancelamentos registrados.</p>
+						</div>
+						<aside class="inventario-cancelados-card__legend" aria-label="Motivos de cancelamento">
+							<h3 class="inventario-cancelados-card__legend-title">Participação por motivo</h3>
+							<ul class="inventario-cancelados-card__legend-list" data-inventario-cancelados-legend-list>
+								<li class="inventario-cancelados-card__legend-empty" data-inventario-cancelados-legend-empty>Sem dados disponíveis</li>
+							</ul>
+							<div class="inventario-cancelados-card__divider" aria-hidden="true"></div>
+							<div class="inventario-cancelados-card__motives" aria-live="polite">
+								<h3 class="inventario-cancelados-card__motives-title">Motivos registrados</h3>
+								<ul class="inventario-cancelados-card__motives-list" data-inventario-cancelados-motives-list>
+									<li class="inventario-cancelados-card__motives-empty" data-inventario-cancelados-motives-empty>Sem motivos disponíveis</li>
+								</ul>
+							</div>
+						</aside>
 					</div>
 				</section>
 				</div>
@@ -516,14 +542,65 @@
 			<section class="dashboard__panel dashboard__panel--slide panel--animate" id="slide-avaria" data-slide-id="avaria" aria-labelledby="panel-avaria-title">
 				<header class="panel__header">
 					<div class="panel__titles">
-						<h1 class="panel__title" id="panel-avaria-title">Avaria - Recuperados</h1>
+						<h1 class="panel__title" id="panel-avaria-title">Avaria - Avariados</h1>
 						<p class="panel__subtitle">Indicadores de recuperação de produtos avariados</p>
 					</div>
 				</header>
-				<section class="chart-card chart-card--placeholder" aria-live="polite">
-					<div class="chart-card__placeholder">
-						<h2 class="chart-card__placeholder-title">Em breve</h2>
-						<p class="chart-card__placeholder-text">Esta seção apresentará dados de avarias recuperadas em uma próxima atualização.</p>
+				<section class="chart-card avaria-setores-card" aria-live="polite">
+					<div class="avaria-setores-card__layout">
+						<div class="avaria-setores-card__chart">
+							<div class="avaria-setores-card__chart-header">
+								<span class="material-symbols-rounded avaria-setores-card__chart-icon" aria-hidden="true">deployed_code</span>
+								<h3 class="avaria-setores-card__chart-title">Valor avariado por setor</h3>
+							</div>
+							<p class="status-message" data-status="avaria-setores">Carregando setores...</p>
+							<div class="avaria-setores-card__chart-canvas">
+								<canvas id="avariaSetoresChart" role="img" aria-label="Valor avariado por setor"></canvas>
+							</div>
+						</div>
+						<aside class="avaria-setores-card__aside" aria-label="Ranking de itens avariados" aria-live="polite">
+							<div class="avaria-setores-card__table-header">
+								<span class="material-symbols-rounded avaria-setores-card__table-icon" aria-hidden="true">military_tech</span>
+								<h3 class="avaria-setores-card__table-title">Top 10 itens avariados</h3>
+								<label class="switch" aria-label="Alternar modo do ranking">
+									<input class="toggle" type="checkbox" data-avaria-top10-toggle aria-label="Ordenar ranking por quantidade avariada" />
+									<span class="slider"></span>
+									<span class="card-side"></span>
+								</label>
+							</div>
+							<p class="status-message" data-status="avaria-top10">Carregando ranking...</p>
+							<div class="avaria-top10-table" role="region" aria-label="Tabela com os dez itens com maior valor avariado">
+								<table class="avaria-top10-table__inner">
+									<thead>
+										<tr>
+											<th scope="col" class="avaria-top10-table__heading avaria-top10-table__heading--item">
+												<span class="avaria-top10-table__header-content">
+													<span class="material-symbols-rounded avaria-top10-table__header-icon" aria-hidden="true">inventory_2</span>
+													<span class="avaria-top10-table__header-label">Item</span>
+												</span>
+											</th>
+											<th scope="col" class="avaria-top10-table__heading avaria-top10-table__heading--description">
+												<span class="avaria-top10-table__header-content">
+													<span class="material-symbols-rounded avaria-top10-table__header-icon" aria-hidden="true">description</span>
+													<span class="avaria-top10-table__header-label">Descrição</span>
+												</span>
+											</th>
+											<th scope="col" class="avaria-top10-table__heading avaria-top10-table__heading--valor">
+												<span class="avaria-top10-table__header-content">
+													<span class="material-symbols-rounded avaria-top10-table__header-icon" aria-hidden="true" data-avaria-top10-header-icon>savings</span>
+													<span class="avaria-top10-table__header-label" data-avaria-top10-header>Valor avariado</span>
+												</span>
+											</th>
+										</tr>
+									</thead>
+									<tbody data-avaria-top10-body>
+										<tr class="avaria-top10-table__empty">
+											<td colspan="3">Sem dados disponíveis</td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
+						</aside>
 					</div>
 				</section>
 			</section>
