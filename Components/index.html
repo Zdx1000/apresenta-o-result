@@ -543,7 +543,7 @@
 				<header class="panel__header">
 					<div class="panel__titles">
 						<h1 class="panel__title" id="panel-avaria-title">Avaria - Avariados</h1>
-						<p class="panel__subtitle">Indicadores de recuperação de produtos avariados</p>
+						<p class="panel__subtitle" id="panel-avaria-subtitle">Indicadores de recuperação de produtos avariados</p>
 					</div>
 					<div class="panel__actions">
 						<button type="button" class="panel__toggle" data-avaria-toggle>
@@ -610,10 +610,130 @@
 							</aside>
 						</div>
 					</section>
-					<section class="chart-card chart-card--placeholder panel-view panel-view--secondary" data-avaria-secondary aria-hidden="true" aria-live="polite">
-						<div class="chart-card__placeholder">
-							<h2 class="chart-card__placeholder-title">Motivos das avarias</h2>
-							<p class="chart-card__placeholder-text">Esta seção apresentará os principais motivos de avarias em uma próxima atualização.</p>
+					<section class="chart-card avaria-motivos-card panel-view panel-view--secondary" data-avaria-secondary aria-hidden="true" aria-live="polite">
+						<div class="chart-card__metrics chart-card__metrics--avaria">
+							<article class="metric-card metric-card--bad" data-avaria-metric="top-sector">
+								<div class="metric-card__header">
+									<span class="metric-card__icon metric-card__icon--up" aria-hidden="true">
+										<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+											<path d="M5.5 16l5.5-5.5 2.6 2.6L19 8.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+											<path d="M13.5 7.5H19v5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+										</svg>
+									</span>
+									<span class="metric-card__label">Maior valor por setor</span>
+								</div>
+								<span class="metric-card__value">&mdash;</span>
+								<span class="metric-card__context">&mdash;</span>
+							</article>
+							<article class="metric-card metric-card--neutral" data-avaria-metric="total-value">
+								<div class="metric-card__header">
+									<span class="metric-card__icon metric-card__icon--sum" aria-hidden="true">
+										<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+											<path d="M16.5 6.5h-9l5 5-5 6h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+										</svg>
+									</span>
+									<span class="metric-card__label">Total avariado</span>
+								</div>
+								<span class="metric-card__value">&mdash;</span>
+								<span class="metric-card__context">&mdash;</span>
+							</article>
+							<article class="metric-card metric-card--bad" data-avaria-metric="top-motive">
+								<div class="metric-card__header">
+									<span class="metric-card__icon" aria-hidden="true">
+										<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+											<circle cx="6" cy="6" r="1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></circle>
+											<circle cx="6" cy="12" r="1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></circle>
+											<circle cx="6" cy="18" r="1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></circle>
+											<path d="M10 6h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+											<path d="M10 12h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+											<path d="M10 18h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+										</svg>
+									</span>
+									<span class="metric-card__label">Motivo mais recorrente</span>
+								</div>
+								<span class="metric-card__value">&mdash;</span>
+								<span class="metric-card__context">&mdash;</span>
+							</article>
+							<article class="metric-card metric-card--neutral" data-avaria-metric="top-destination">
+								<div class="metric-card__header">
+									<span class="metric-card__icon" aria-hidden="true">
+										<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+											<path d="M5.5 6.5h8l-2.5-2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+											<path d="M5.5 17.5h8l-2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+											<path d="M5.5 12h13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+										</svg>
+									</span>
+									<span class="metric-card__label">Destinação principal</span>
+								</div>
+								<span class="metric-card__value">&mdash;</span>
+								<span class="metric-card__context">&mdash;</span>
+							</article>
+							<article class="metric-card metric-card--neutral" data-avaria-metric="top-shift">
+								<div class="metric-card__header">
+									<span class="metric-card__icon" aria-hidden="true">
+										<svg viewBox="0 0 24 24" role="presentation" focusable="false">
+											<circle cx="12" cy="12" r="6.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></circle>
+											<path d="M12 8v4l2.8 1.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+											<path d="M12 3v1.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+											<path d="M12 19.2V21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+									</svg>
+									</span>
+									<span class="metric-card__label">Turno mais impactado</span>
+								</div>
+								<span class="metric-card__value">&mdash;</span>
+								<span class="metric-card__context">&mdash;</span>
+							</article>
+						</div>
+						<div class="avaria-motivos-card__layout">
+							<div class="avaria-motivos-card__content">
+								<div class="avaria-motivos-card__table">
+									<p class="status-message" data-status="avaria-motivos">Carregando motivos...</p>
+										<div class="avaria-motivos-table corte-top10-table" role="region" aria-label="Tabela com os motivos das avarias">
+											<table class="avaria-motivos-table__inner corte-top10-table__inner">
+											<thead>
+												<tr>
+														<th scope="col" class="avaria-motivos-table__heading corte-top10-table__heading avaria-motivos-table__heading--rank">#</th>
+														<th scope="col" class="avaria-motivos-table__heading corte-top10-table__heading avaria-motivos-table__heading--motivo">Motivo</th>
+														<th scope="col" class="avaria-motivos-table__heading corte-top10-table__heading avaria-motivos-table__heading--valor">Valor avariado</th>
+														<th scope="col" class="avaria-motivos-table__heading corte-top10-table__heading avaria-motivos-table__heading--quantidade">Quantidade</th>
+														<th scope="col" class="avaria-motivos-table__heading corte-top10-table__heading avaria-motivos-table__heading--participacao">Participação</th>
+												</tr>
+											</thead>
+												<tbody class="avaria-motivos-table__body" data-avaria-motivos-body>
+													<tr class="avaria-motivos-table__empty corte-top10-table__empty">
+													<td colspan="5">Sem dados disponíveis</td>
+												</tr>
+											</tbody>
+											</table>
+										</div>
+								</div>
+								<aside class="avaria-motivos-card__insights" aria-label="Indicadores complementares das avarias">
+									<article class="avaria-motivos-mini-card avaria-motivos-mini-card--bars" aria-labelledby="avaria-direcionados-title">
+										<header class="avaria-motivos-mini-card__header">
+											<div class="avaria-motivos-mini-card__titles">
+												<h3 class="avaria-motivos-mini-card__title" id="avaria-direcionados-title">Direcionamento das avarias</h3>
+												<p class="avaria-motivos-mini-card__subtitle">Valor avariado por destino</p>
+											</div>
+										</header>
+										<div class="avaria-motivos-mini-card__canvas">
+											<p class="status-message" data-status="avaria-direcionados">Carregando direcionamentos...</p>
+											<canvas id="avariaDirecionadosChart" role="img" aria-label="Gráfico de barras com os valores avariados por direcionamento"></canvas>
+										</div>
+									</article>
+									<article class="avaria-motivos-mini-card avaria-motivos-mini-card--donut" aria-labelledby="avaria-turnos-title">
+										<header class="avaria-motivos-mini-card__header">
+											<div class="avaria-motivos-mini-card__titles">
+												<h3 class="avaria-motivos-mini-card__title" id="avaria-turnos-title">Avarias por turno</h3>
+												<p class="avaria-motivos-mini-card__subtitle">Participação por setor responsável</p>
+											</div>
+										</header>
+										<div class="avaria-motivos-mini-card__canvas avaria-motivos-mini-card__canvas--donut">
+											<p class="status-message" data-status="avaria-turnos">Carregando turnos...</p>
+											<canvas id="avariaTurnosChart" role="img" aria-label="Gráfico de rosca com os valores avariados por setor"></canvas>
+										</div>
+									</article>
+								</aside>
+							</div>
 						</div>
 					</section>
 				</div>

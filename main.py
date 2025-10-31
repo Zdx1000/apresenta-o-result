@@ -490,6 +490,36 @@ def get_avaria_top10():
     return jsonify(payload)
 
 
+@app.route("/api/avaria/motivos", methods=["GET"])
+def get_avaria_motivos():
+    dataframe = load_avaria_motivos_dataframe()
+    if dataframe is None or dataframe.empty:
+        return jsonify({"error": "Dados indisponiveis"}), 500
+
+    payload = _serialize_dataframe(dataframe)
+    return jsonify(payload)
+
+
+@app.route("/api/avaria/direcionados", methods=["GET"])
+def get_avaria_direcionados():
+    dataframe = load_avaria_direcionados_dataframe()
+    if dataframe is None or dataframe.empty:
+        return jsonify({"error": "Dados indisponiveis"}), 500
+
+    payload = _serialize_dataframe(dataframe)
+    return jsonify(payload)
+
+
+@app.route("/api/avaria/turnos", methods=["GET"])
+def get_avaria_turnos():
+    dataframe = load_avaria_turnos_dataframe()
+    if dataframe is None or dataframe.empty:
+        return jsonify({"error": "Dados indisponiveis"}), 500
+
+    payload = _serialize_dataframe(dataframe)
+    return jsonify(payload)
+
+
 def load_funnel_dataframe():
     dataframe = _load_sheet(DATA_SHEET_FUNNEL)
     if dataframe is None:

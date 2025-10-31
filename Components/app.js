@@ -4,8 +4,11 @@ const API_ENDPOINT_CORTE_MOTIVOS = "/api/corte/motivos";
 const API_ENDPOINT_CORTE_SETORES = "/api/corte/setores";
 const API_ENDPOINT_CORTE_TOP10 = "/api/corte/top10";
 const API_ENDPOINT_INVENTARIO = "/api/inventario";
+const API_ENDPOINT_AVARIA_MOTIVOS = "/api/avaria/motivos";
 const API_ENDPOINT_AVARIA_SETORES = "/api/avaria/setores";
 const API_ENDPOINT_AVARIA_TOP10 = "/api/avaria/top10";
+const API_ENDPOINT_AVARIA_DIRECIONADOS = "/api/avaria/direcionados";
+const API_ENDPOINT_AVARIA_TURNOS = "/api/avaria/turnos";
 
 const currencyFormatter = new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -29,9 +32,12 @@ let corteChartInstance = null;
 let corteSetoresChartInstance = null;
 let inventarioChartInstance = null;
 let avariaSetoresChartInstance = null;
+let avariaDirecionadosChartInstance = null;
+let avariaTurnosChartInstance = null;
 let metricsDOM = null;
 let corteMetricsDOM = null;
 let motivosTableBody = null;
+let avariaMotivosTableBody = null;
 let corteDatasetCache = null;
 let corteMotivosSummary = [];
 let corteSetoresDatasetCache = null;
@@ -53,11 +59,16 @@ let avariaTop10StatusDOM = null;
 let inventarioDatasetCache = null;
 let inventarioValoresDOM = null;
 let inventarioMetricsDOM = null;
+let avariaMetricsDOM = null;
 let inventarioCanceladosChartInstance = null;
 let inventarioCanceladosDOM = null;
 let bloqueadoDatasetCache = null;
 let bloqueadoTop10List = null;
 let bloqueadoTop10Insights = null;
+let avariaMotivosSummary = [];
+let avariaDirecionadosDataset = [];
+let avariaTurnosDataset = [];
+let avariaSecondarySection = null;
 
 const MOTIVO_KEY_CANDIDATES = ["Motivos", "Motivo", "Descrição", "Descricao", "Categoria"];
 const VALOR_KEY_CANDIDATES = ["Soma de Valor Total", "Valor Total", "Total", "Valor", "Soma"];
@@ -223,6 +234,46 @@ const AVARIA_TOP10_DESCRIPTION_CANDIDATES = [
 ];
 const AVARIA_TOP10_VALUE_CANDIDATES = ["Valor", "Valor Avariado", "Total"];
 const AVARIA_TOP10_QUANTITY_CANDIDATES = ["Quantidade", "Qtd", "Qtde", "Qtd Avariada", "Volume"];
+const AVARIA_MOTIVOS_MOTIVE_CANDIDATES = [
+    "Motivo",
+    "Motivos",
+    "Categoria",
+    "Descrição",
+    "Descricao",
+    "Causa",
+    "Motivo Avaria",
+    "Motivo de Avaria",
+];
+const AVARIA_MOTIVOS_VALUE_CANDIDATES = [
+    "Valor",
+    "Valor Avariado",
+    "Total",
+    "Total Avariado",
+    "Soma",
+];
+const AVARIA_MOTIVOS_QUANTITY_CANDIDATES = [
+    "Quantidade",
+    "Qtd",
+    "Qtde",
+    "Qtd Avariada",
+    "Quantidade Avariada",
+    "Contagem de UNID.",
+    "Contagem de UNID",
+];
+const AVARIA_MOTIVOS_SHARE_CANDIDATES = [
+    "% Participação",
+    "% Participacao",
+    "%",
+    "Participação",
+    "Participacao",
+    "Share",
+    "Percentual",
+];
+const AVARIA_DIRECIONADOS_LABEL_CANDIDATES = ["Direcionados", "Direcionado", "Destino", "Área", "Area", "Setor", "Rota"];
+const AVARIA_DIRECIONADOS_VALUE_CANDIDATES = ["Avariado", "Valor Avariado", "Valor", "Total", "Soma"];
+const AVARIA_DIRECIONADOS_RECOVERED_CANDIDATES = ["Recuperado", "Valor Recuperado", "Recuperacao", "Recuperação"];
+const AVARIA_TURNOS_LABEL_CANDIDATES = ["Setores", "Setor", "Turno", "Equipe", "Operação", "Operacao", "Direcionamento"];
+const AVARIA_TURNOS_VALUE_CANDIDATES = ["Valor Avariado", "Valor", "Total", "Soma"];
 const SETORES_CHART_HIGHLIGHT_GRADIENTS = [
     ["rgba(10, 5, 143, 1)", "rgba(4, 4, 90, 1)"],
     ["rgba(0, 42, 220, 0.88)", "rgba(0, 31, 84, 0.84)"],
@@ -249,6 +300,24 @@ const SETORES_CHART_HIGHLIGHT_HOVER_BORDER_PALETTE = [
 ];
 const SETORES_CHART_HIGHLIGHT_LABEL_COLOR = "rgba(0, 31, 84, 0.92)";
 const SETORES_CHART_NEUTRAL_LABEL_COLOR = "rgba(31, 36, 48, 0.66)";
+const AVARIA_DIRECIONADOS_BAR_COLORS = [
+    "rgba(4, 1, 82, 0.92)",
+    "rgba(0, 42, 220, 0.9)",
+    "rgba(0, 72, 200, 0.88)",
+    "rgba(0, 102, 196, 0.86)",
+    "rgba(0, 132, 190, 0.84)",
+    "rgba(0, 162, 184, 0.82)",
+];
+const AVARIA_DIRECIONADOS_BORDER_COLORS = [
+    "rgba(5, 10, 80, 0.92)",
+    "rgba(0, 24, 108, 0.9)",
+    "rgba(0, 46, 118, 0.88)",
+    "rgba(0, 64, 120, 0.86)",
+    "rgba(0, 82, 122, 0.84)",
+    "rgba(0, 98, 124, 0.82)",
+];
+const AVARIA_TURNOS_COLOR_PALETTE = [...AVARIA_DIRECIONADOS_BAR_COLORS];
+const AVARIA_TURNOS_BORDER_COLORS = [...AVARIA_DIRECIONADOS_BORDER_COLORS];
 
 const normalizeKeyName = (key) => {
     if (typeof key !== "string") {
@@ -445,8 +514,12 @@ document.addEventListener("DOMContentLoaded", () => {
     corteTop10StatusDOM = document.querySelector('[data-status="corte-top10"]');
     const avariaSetoresStatusElement = document.querySelector('[data-status="avaria-setores"]');
     avariaTop10StatusDOM = document.querySelector('[data-status="avaria-top10"]');
+    const avariaMotivosStatusElement = document.querySelector('[data-status="avaria-motivos"]');
+    const avariaDirecionadosStatusElement = document.querySelector('[data-status="avaria-direcionados"]');
+    const avariaTurnosStatusElement = document.querySelector('[data-status="avaria-turnos"]');
     const inventarioStatusElement = document.querySelector('[data-status="inventario"]');
     motivosTableBody = document.querySelector("[data-motivos-body]");
+    avariaMotivosTableBody = document.querySelector("[data-avaria-motivos-body]");
     corteTop10TableBody = document.querySelector("[data-corte-top10-body]");
     avariaTop10TableBody = document.querySelector("[data-avaria-top10-body]");
     corteTop10Toggle = document.querySelector('[data-corte-top10-toggle]');
@@ -460,8 +533,10 @@ document.addEventListener("DOMContentLoaded", () => {
     metricsDOM = collectMetricElements();
     corteMetricsDOM = collectCorteMetricElements();
     inventarioMetricsDOM = collectInventarioMetricElements();
+    avariaMetricsDOM = collectAvariaMetricElements();
     inventarioValoresDOM = collectInventarioValoresElements();
     inventarioCanceladosDOM = collectInventarioCanceladosElements();
+    avariaSecondarySection = document.querySelector("[data-avaria-secondary]");
 
     if (corteTop10Toggle) {
         corteTop10Toggle.addEventListener('change', handleCorteTop10ToggleChange);
@@ -476,6 +551,7 @@ document.addEventListener("DOMContentLoaded", () => {
     clearMetrics();
     clearCorteMetrics();
     clearInventarioMetrics();
+    clearAvariaMetrics();
     resetInventarioValoresCard();
     const panelAnimator = initPanelScrollAnimation();
     initSlideNavigation(panelAnimator);
@@ -492,6 +568,9 @@ document.addEventListener("DOMContentLoaded", () => {
     loadCorteTop10Dataset(corteTop10StatusDOM);
     loadAvariaSetoresDataset(avariaSetoresStatusElement);
     loadAvariaTop10Dataset(avariaTop10StatusDOM);
+    loadAvariaMotivosDataset(avariaMotivosStatusElement);
+    loadAvariaDirecionadosDataset(avariaDirecionadosStatusElement);
+    loadAvariaTurnosDataset(avariaTurnosStatusElement);
     loadInventarioDataset(inventarioStatusElement);
 });
 
@@ -1029,17 +1108,37 @@ function initAvariaToggle() {
         secondarySelector: "[data-avaria-secondary]",
         showSecondaryLabel: "Avarias - Motivos",
         showPrimaryLabel: "Avaria - Avariados",
+        headingSelector: "#panel-avaria-title",
+        primaryHeading: "Avaria - Avariados",
+        secondaryHeading: "Motivos das avarias",
+        subtitleSelector: "#panel-avaria-subtitle",
+        primarySubtitle: "Indicadores de recuperação de produtos avariados",
+        secondarySubtitle: "Principais causas e participação no total avariado",
     });
 
     const toggleButton = document.querySelector("[data-avaria-toggle]");
     const primarySection = document.querySelector("[data-avaria-primary]");
+    const secondarySection = document.querySelector("[data-avaria-secondary]");
 
-    if (toggleButton && primarySection) {
+    if (toggleButton && (primarySection || secondarySection)) {
         toggleButton.addEventListener("click", () => {
             requestAnimationFrame(() => {
                 setTimeout(() => {
-                    if (primarySection.getAttribute("aria-hidden") !== "true" && avariaSetoresChartInstance) {
+                    if (
+                        primarySection &&
+                        primarySection.getAttribute("aria-hidden") !== "true" &&
+                        avariaSetoresChartInstance
+                    ) {
                         avariaSetoresChartInstance.resize();
+                    }
+
+                    if (secondarySection && secondarySection.getAttribute("aria-hidden") !== "true") {
+                        if (avariaDirecionadosChartInstance) {
+                            avariaDirecionadosChartInstance.resize();
+                        }
+                        if (avariaTurnosChartInstance) {
+                            avariaTurnosChartInstance.resize();
+                        }
                     }
                 }, 320);
             });
@@ -1189,6 +1288,9 @@ function loadAvariaSetoresDataset(statusElement) {
                 }
             }
         })
+        .then(() => {
+            updateAvariaMetrics();
+        })
         .catch((error) => {
             console.error(error);
             avariaSetoresDatasetCache = null;
@@ -1197,6 +1299,7 @@ function loadAvariaSetoresDataset(statusElement) {
                 statusElement.classList.remove("status-message--hidden");
             }
             renderAvariaSetoresChart([]);
+            updateAvariaMetrics();
         });
 }
 
@@ -1224,6 +1327,112 @@ function loadAvariaTop10Dataset(statusElement) {
                 statusElement.classList.remove("status-message--hidden");
                 statusElement.dataset.avariaTop10State = "error";
             }
+        });
+}
+
+function loadAvariaMotivosDataset(statusElement) {
+    fetch(API_ENDPOINT_AVARIA_MOTIVOS)
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error("Falha ao carregar os motivos de avaria");
+            }
+            return response.json();
+        })
+        .then((payload) => {
+            avariaMotivosSummary = normalizeAvariaMotivosRows(payload?.rows);
+            populateAvariaMotivosTable(avariaMotivosSummary);
+
+            if (statusElement) {
+                if (avariaMotivosSummary.length) {
+                    statusElement.textContent = "";
+                    statusElement.classList.add("status-message--hidden");
+                } else {
+                    statusElement.textContent = "Sem dados disponíveis.";
+                    statusElement.classList.remove("status-message--hidden");
+                }
+            }
+            updateAvariaMetrics();
+        })
+        .catch((error) => {
+            console.error(error);
+            avariaMotivosSummary = [];
+            populateAvariaMotivosTable(avariaMotivosSummary);
+            if (statusElement) {
+                statusElement.textContent = "Nao foi possivel carregar os dados.";
+                statusElement.classList.remove("status-message--hidden");
+            }
+            updateAvariaMetrics();
+        });
+}
+
+function loadAvariaDirecionadosDataset(statusElement) {
+    fetch(API_ENDPOINT_AVARIA_DIRECIONADOS)
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error("Falha ao carregar os direcionamentos de avaria");
+            }
+            return response.json();
+        })
+        .then((payload) => {
+            avariaDirecionadosDataset = normalizeAvariaDirecionadosRows(payload?.rows);
+            renderAvariaDirecionadosChart(avariaDirecionadosDataset);
+
+            if (statusElement) {
+                const hasVisibleData = avariaDirecionadosDataset.some((entry) => !entry?.placeholder);
+                if (hasVisibleData) {
+                    statusElement.textContent = "";
+                    statusElement.classList.add("status-message--hidden");
+                } else {
+                    statusElement.textContent = "Sem dados disponíveis.";
+                    statusElement.classList.remove("status-message--hidden");
+                }
+            }
+            updateAvariaMetrics();
+        })
+        .catch((error) => {
+            console.error(error);
+            avariaDirecionadosDataset = [];
+            renderAvariaDirecionadosChart(avariaDirecionadosDataset);
+            if (statusElement) {
+                statusElement.textContent = "Nao foi possivel carregar os dados.";
+                statusElement.classList.remove("status-message--hidden");
+            }
+            updateAvariaMetrics();
+        });
+}
+
+function loadAvariaTurnosDataset(statusElement) {
+    fetch(API_ENDPOINT_AVARIA_TURNOS)
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error("Falha ao carregar os turnos de avaria");
+            }
+            return response.json();
+        })
+        .then((payload) => {
+            avariaTurnosDataset = normalizeAvariaTurnosRows(payload?.rows);
+            renderAvariaTurnosChart(avariaTurnosDataset);
+
+            if (statusElement) {
+                if (avariaTurnosDataset.length) {
+                    statusElement.textContent = "";
+                    statusElement.classList.add("status-message--hidden");
+                } else {
+                    statusElement.textContent = "Sem dados disponíveis.";
+                    statusElement.classList.remove("status-message--hidden");
+                }
+            }
+            updateAvariaMetrics();
+        })
+        .catch((error) => {
+            console.error(error);
+            avariaTurnosDataset = [];
+            renderAvariaTurnosChart(avariaTurnosDataset);
+            if (statusElement) {
+                statusElement.textContent = "Nao foi possivel carregar os dados.";
+                statusElement.classList.remove("status-message--hidden");
+            }
+            updateAvariaMetrics();
         });
 }
 
@@ -1551,6 +1760,129 @@ function normalizeAvariaSetoresRows(rows) {
     return filtered;
 }
 
+function normalizeAvariaMotivosRows(rows) {
+    const safeRows = Array.isArray(rows) ? rows : [];
+    const mapped = safeRows.map((row) => {
+        const motiveValue = extractValueFromRow(row, AVARIA_MOTIVOS_MOTIVE_CANDIDATES);
+        const totalValue = extractValueFromRow(row, AVARIA_MOTIVOS_VALUE_CANDIDATES);
+        const quantityValue = extractValueFromRow(row, AVARIA_MOTIVOS_QUANTITY_CANDIDATES);
+        const shareValue = extractValueFromRow(row, AVARIA_MOTIVOS_SHARE_CANDIDATES);
+
+        const numericTotal = parseNumericValue(totalValue);
+        const numericQuantity = parseNumericValue(quantityValue);
+        let numericShare = parseNumericValue(shareValue);
+
+        if (Number.isFinite(numericShare) && Math.abs(numericShare) > 1) {
+            numericShare = numericShare / 100;
+        }
+
+        return {
+            motive: motiveValue !== null && motiveValue !== undefined ? String(motiveValue) : "",
+            value: Number.isFinite(numericTotal) ? numericTotal : null,
+            rawValue: totalValue,
+            quantity: Number.isFinite(numericQuantity) ? numericQuantity : null,
+            rawQuantity: quantityValue,
+            share: Number.isFinite(numericShare) ? numericShare : null,
+            rawShare: shareValue,
+        };
+    });
+
+    const totalValue = mapped.reduce((sum, entry) => {
+        return sum + (Number.isFinite(entry.value) ? entry.value : 0);
+    }, 0);
+
+    mapped.forEach((entry) => {
+        if ((entry.share === null || Number.isNaN(entry.share)) && Number.isFinite(entry.value) && totalValue > 0) {
+            entry.share = entry.value / totalValue;
+        }
+    });
+
+    const filtered = mapped.filter((entry) => {
+        return (
+            entry.motive ||
+            Number.isFinite(entry.value) ||
+            Number.isFinite(entry.quantity) ||
+            Number.isFinite(entry.share)
+        );
+    });
+
+    filtered.sort((a, b) => {
+        const aValue = Number.isFinite(a.value) ? a.value : -Infinity;
+        const bValue = Number.isFinite(b.value) ? b.value : -Infinity;
+        if (aValue !== bValue) {
+            return bValue - aValue;
+        }
+        const aQuantity = Number.isFinite(a.quantity) ? a.quantity : -Infinity;
+        const bQuantity = Number.isFinite(b.quantity) ? b.quantity : -Infinity;
+        return bQuantity - aQuantity;
+    });
+
+    return filtered;
+}
+
+function normalizeAvariaDirecionadosRows(rows) {
+    const safeRows = Array.isArray(rows) ? rows : [];
+    const mapped = safeRows.map((row) => {
+        const labelValue = extractValueFromRow(row, AVARIA_DIRECIONADOS_LABEL_CANDIDATES);
+        const totalValue = extractValueFromRow(row, AVARIA_DIRECIONADOS_VALUE_CANDIDATES);
+        const recoveredValue = extractValueFromRow(row, AVARIA_DIRECIONADOS_RECOVERED_CANDIDATES);
+        const numericTotal = parseNumericValue(totalValue);
+        const numericRecovered = parseNumericValue(recoveredValue);
+
+        return {
+            label:
+                labelValue !== null && labelValue !== undefined
+                    ? String(labelValue).trim()
+                    : "",
+            value: Number.isFinite(numericTotal) ? numericTotal : null,
+            rawValue: totalValue,
+            recovered: Number.isFinite(numericRecovered) ? numericRecovered : null,
+            rawRecovered: recoveredValue,
+        };
+    });
+
+    const placeholderLabelPattern = /^\(?\s*vazio\s*\)?$/i;
+    const processed = mapped
+        .map((entry) => {
+            const labelText = typeof entry.label === "string" ? entry.label.trim() : "";
+            const isPlaceholder = placeholderLabelPattern.test(labelText);
+            return {
+                ...entry,
+                label: labelText,
+                placeholder: isPlaceholder,
+            };
+        })
+        .filter((entry) => {
+            if (entry.placeholder) {
+                return Number.isFinite(entry.value) || Number.isFinite(entry.recovered);
+            }
+
+            return entry.label || Number.isFinite(entry.value);
+        });
+
+    processed.sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+    return processed;
+}
+
+function normalizeAvariaTurnosRows(rows) {
+    const safeRows = Array.isArray(rows) ? rows : [];
+    const mapped = safeRows.map((row) => {
+        const labelValue = extractValueFromRow(row, AVARIA_TURNOS_LABEL_CANDIDATES);
+        const totalValue = extractValueFromRow(row, AVARIA_TURNOS_VALUE_CANDIDATES);
+        const numericTotal = parseNumericValue(totalValue);
+
+        return {
+            label: labelValue !== null && labelValue !== undefined ? String(labelValue) : "",
+            value: Number.isFinite(numericTotal) ? numericTotal : null,
+            rawValue: totalValue,
+        };
+    });
+
+    const filtered = mapped.filter((entry) => entry.label || Number.isFinite(entry.value));
+    filtered.sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+    return filtered;
+}
+
 function renderAvariaSetoresChart(rows) {
     const canvasElement = document.getElementById("avariaSetoresChart");
     if (!canvasElement) {
@@ -1837,6 +2169,461 @@ function renderAvariaSetoresChart(rows) {
             },
         },
         plugins: [avariaSetoresValueLabels],
+    });
+}
+
+function renderAvariaDirecionadosChart(rows) {
+    const canvasElement = document.getElementById("avariaDirecionadosChart");
+    if (!canvasElement) {
+        return;
+    }
+
+    if (avariaDirecionadosChartInstance) {
+        avariaDirecionadosChartInstance.destroy();
+        avariaDirecionadosChartInstance = null;
+    }
+
+    removeExistingTooltip(canvasElement);
+
+    if (!Array.isArray(rows) || !rows.length) {
+        const context = canvasElement.getContext("2d");
+        if (context) {
+            const width = canvasElement.width || canvasElement.clientWidth || 0;
+            const height = canvasElement.height || canvasElement.clientHeight || 0;
+            context.clearRect(0, 0, width, height);
+        }
+        return;
+    }
+
+    const visibleEntries = rows.filter((entry) => !entry?.placeholder);
+    const topEntries = visibleEntries.slice(0, 6);
+
+    if (!topEntries.length) {
+        const context = canvasElement.getContext("2d");
+        if (context) {
+            const width = canvasElement.width || canvasElement.clientWidth || 0;
+            const height = canvasElement.height || canvasElement.clientHeight || 0;
+            context.clearRect(0, 0, width, height);
+        }
+        return;
+    }
+
+    const labels = topEntries.map((entry) => entry.label || "Sem destino");
+    const values = topEntries.map((entry) => (Number.isFinite(entry.value) ? entry.value : 0));
+    const totalValue = values.reduce((sum, current) => (Number.isFinite(current) ? sum + current : sum), 0);
+
+    const barColors = labels.map((_, index) => AVARIA_DIRECIONADOS_BAR_COLORS[index % AVARIA_DIRECIONADOS_BAR_COLORS.length]);
+    const borderColors = labels.map((_, index) => AVARIA_DIRECIONADOS_BORDER_COLORS[index % AVARIA_DIRECIONADOS_BORDER_COLORS.length]);
+
+    const styles = getComputedStyle(document.documentElement);
+    const axisColor = styles.getPropertyValue("--color-axis").trim() || "#7d8597";
+    const gridColor = styles.getPropertyValue("--color-grid").trim() || "rgba(0, 47, 66, 0.08)";
+    const textMain = styles.getPropertyValue("--color-text-main").trim() || "#1f2430";
+
+    const toneClassMap = {
+        good: "good",
+        bad: "bad",
+        neutral: "neutral",
+    };
+
+    const tooltipIcons = {
+        value:
+            '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19h14"></path><path d="M8 19V11"></path><path d="M12 19V7"></path><path d="M16 19V13"></path></svg>',
+        percent:
+            '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 17.5l11-11"></path><circle cx="8.5" cy="8.5" r="2.5"></circle><circle cx="15.5" cy="15.5" r="2.5"></circle></svg>',
+    };
+
+    const getEntriesForBar = (index) => {
+        const value = Number.isFinite(values[index]) ? values[index] : 0;
+        const share = totalValue > 0 ? value / totalValue : null;
+        const entries = [
+            {
+                label: "Valor avariado",
+                value: currencyFormatter.format(value),
+                emphasize: true,
+                icon: "value",
+            },
+        ];
+
+        if (share !== null && Number.isFinite(share)) {
+            entries.push({
+                label: "Participação",
+                value: percentageFormatter.format(share),
+                icon: "percent",
+            });
+        }
+
+        entries.push({
+            label: "Posição",
+            value: `#${index + 1}`,
+            muted: true,
+        });
+
+        return entries;
+    };
+
+    const tooltipHelpers = {
+        getEntriesForBar,
+        toneClassMap,
+        icons: tooltipIcons,
+    };
+
+    const valueLabelPlugin = {
+        id: "avariaDirecionadosValueLabels",
+        afterDatasetsDraw(chart) {
+            const meta = chart.getDatasetMeta(0);
+            if (!meta) {
+                return;
+            }
+
+            const { ctx } = chart;
+            ctx.save();
+            ctx.textBaseline = "middle";
+            ctx.font = "600 12px 'Segoe UI', Tahoma";
+
+            const finiteValues = values.map((value) => (Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY));
+            const maxValue = finiteValues.reduce(
+                (currentMax, currentValue) => (currentValue > currentMax ? currentValue : currentMax),
+                Number.NEGATIVE_INFINITY
+            );
+            const maxIndex = finiteValues.indexOf(maxValue);
+
+            meta.data.forEach((barElement, index) => {
+                const value = values[index];
+                if (!barElement || !Number.isFinite(value)) {
+                    return;
+                }
+
+                const isTopBar = maxIndex !== -1 && index === maxIndex;
+                ctx.fillStyle = isTopBar ? "#ffffff" : "rgba(14, 28, 78, 0.9)";
+
+                const { x, y } = barElement.tooltipPosition();
+                const label = currencyFormatter.format(value);
+                const padding = 10;
+                const textWidth = ctx.measureText(label).width;
+                const chartArea = chart.chartArea;
+                const chartRight = chartArea ? chartArea.right - 6 : ctx.canvas.width - 16;
+                let drawX = x + padding;
+                let textAlign = "left";
+
+                if (drawX + textWidth > chartRight) {
+                    drawX = x - padding;
+                    textAlign = "right";
+                }
+
+                ctx.textAlign = textAlign;
+                ctx.fillText(label, drawX, y);
+            });
+
+            ctx.restore();
+        },
+    };
+
+    avariaDirecionadosChartInstance = new Chart(canvasElement, {
+        type: "bar",
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: "Valor avariado",
+                    data: values,
+                    backgroundColor: barColors,
+                    borderColor: borderColors,
+                    borderWidth: 1.1,
+                    borderRadius: 4,
+                    borderSkipped: false,
+                    barPercentage: 0.82,
+                    categoryPercentage: 0.78,
+                    maxBarThickness: 96,
+                },
+            ],
+        },
+        options: {
+            indexAxis: "y",
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false,
+                },
+                tooltip: {
+                    enabled: false,
+                    external: (context) => externalTooltipHandler(context, tooltipHelpers),
+                },
+            },
+            layout: {
+                padding: {
+                    top: 8,
+                    bottom: 4,
+                    left: 6,
+                    right: 10,
+                },
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: axisColor,
+                        padding: 6,
+                        callback: (value) => {
+                            const numericValue = Number(value);
+                            return currencyFormatter.format(Number.isFinite(numericValue) ? numericValue : 0);
+                        },
+                        maxTicksLimit: 5,
+                    },
+                    grid: {
+                        color: gridColor,
+                        drawBorder: false,
+                        lineWidth: 0.5,
+                    },
+                },
+                y: {
+                    ticks: {
+                        color: textMain,
+                        padding: 8,
+                        font: {
+                            size: 12,
+                            weight: "600",
+                        },
+                    },
+                    grid: {
+                        display: false,
+                    },
+                    border: {
+                        display: false,
+                    },
+                },
+            },
+        },
+        plugins: [valueLabelPlugin],
+    });
+
+    scheduleAvariaSecondaryResize();
+}
+
+function renderAvariaTurnosChart(rows) {
+    const canvasElement = document.getElementById("avariaTurnosChart");
+    if (!canvasElement) {
+        return;
+    }
+
+    if (avariaTurnosChartInstance) {
+        avariaTurnosChartInstance.destroy();
+        avariaTurnosChartInstance = null;
+    }
+
+    removeExistingTooltip(canvasElement);
+
+    if (!Array.isArray(rows) || !rows.length) {
+        const context = canvasElement.getContext("2d");
+        if (context) {
+            const width = canvasElement.width || canvasElement.clientWidth || 0;
+            const height = canvasElement.height || canvasElement.clientHeight || 0;
+            context.clearRect(0, 0, width, height);
+        }
+        return;
+    }
+
+    const topEntries = rows.slice(0, 8);
+    const labels = topEntries.map((entry) => entry.label || "Sem setor");
+    const values = topEntries.map((entry) => (Number.isFinite(entry.value) ? entry.value : 0));
+    const totalValue = values.reduce((sum, current) => (Number.isFinite(current) ? sum + current : sum), 0);
+    const shares = totalValue > 0
+        ? values.map((value) => (Number.isFinite(value) ? value / totalValue : 0))
+        : values.map(() => 0);
+
+    const colors = labels.map((_, index) => AVARIA_TURNOS_COLOR_PALETTE[index % AVARIA_TURNOS_COLOR_PALETTE.length]);
+    const borderColors = labels.map((_, index) => AVARIA_TURNOS_BORDER_COLORS[index % AVARIA_TURNOS_BORDER_COLORS.length]);
+
+    const toneClassMap = {
+        good: "good",
+        bad: "bad",
+        neutral: "neutral",
+    };
+
+    const tooltipIcons = {
+        value:
+            '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19h14"></path><path d="M8 19V11"></path><path d="M12 19V7"></path><path d="M16 19V13"></path></svg>',
+        percent:
+            '<svg viewBox="0 0 24 24" role="presentation" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 17.5l11-11"></path><circle cx="8.5" cy="8.5" r="2.5"></circle><circle cx="15.5" cy="15.5" r="2.5"></circle></svg>',
+    };
+
+    const getEntriesForBar = (index) => {
+        const value = Number.isFinite(values[index]) ? values[index] : 0;
+        const share = Number.isFinite(shares[index]) ? shares[index] : null;
+        const entries = [
+            {
+                label: "Valor avariado",
+                value: currencyFormatter.format(value),
+                emphasize: true,
+                icon: "value",
+            },
+        ];
+
+        if (share !== null && share > 0) {
+            entries.push({
+                label: "Participação",
+                value: percentageFormatter.format(share),
+                icon: "percent",
+            });
+        }
+
+        entries.push({
+            label: "Posição",
+            value: `#${index + 1}`,
+            muted: true,
+        });
+
+        return entries;
+    };
+
+    const tooltipHelpers = {
+        getEntriesForBar,
+        toneClassMap,
+        icons: tooltipIcons,
+    };
+
+    const centerLabelPlugin = {
+        id: "avariaTurnosCenterLabel",
+        afterDatasetsDraw(chart) {
+            const { ctx, chartArea } = chart;
+            if (!ctx || !chartArea) {
+                return;
+            }
+
+            const centerX = (chartArea.left + chartArea.right) / 2;
+            const arcRadius = Math.min(chartArea.width, chartArea.height);
+            const centerY = chart.options.rotation === -90 && chart.options.circumference === 180
+                ? chartArea.bottom - arcRadius * 0.28
+                : (chartArea.top + chartArea.bottom) / 2;
+            const formattedTotal = currencyFormatter.format(totalValue);
+            const totalFontSize = formattedTotal.length > 14 ? 14 : 16;
+
+            ctx.save();
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            ctx.font = "500 11px 'Segoe UI', Tahoma";
+            ctx.fillStyle = "rgba(0, 72, 84, 0.64)";
+            ctx.fillText("Total", centerX, centerY - 12);
+
+            ctx.font = `700 ${totalFontSize}px 'Segoe UI', Tahoma`;
+            ctx.fillStyle = "rgba(0, 72, 84, 0.92)";
+            ctx.fillText(formattedTotal, centerX, centerY + 9);
+
+            ctx.restore();
+        },
+    };
+
+    avariaTurnosChartInstance = new Chart(canvasElement, {
+        type: "doughnut",
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: "Valor avariado",
+                    data: values,
+                    backgroundColor: colors,
+                    borderColor: borderColors,
+                    borderWidth: 1.4,
+                    hoverBorderColor: borderColors,
+                    hoverOffset: 6,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: "58%",
+            circumference: 180,
+            rotation: -90,
+            plugins: {
+                legend: {
+                    display: false,
+                },
+                tooltip: {
+                    enabled: false,
+                    external: (context) => externalTooltipHandler(context, tooltipHelpers),
+                },
+            },
+        },
+        plugins: [centerLabelPlugin],
+    });
+    scheduleAvariaSecondaryResize();
+}
+
+function populateAvariaMotivosTable(entries) {
+    if (!avariaMotivosTableBody) {
+        return;
+    }
+
+    const safeEntries = Array.isArray(entries) ? entries : [];
+    const limitedEntries = safeEntries.slice(0, 15);
+
+    if (!limitedEntries.length) {
+        avariaMotivosTableBody.innerHTML =
+            '<tr class="avaria-motivos-table__empty corte-top10-table__empty"><td colspan="5">Sem dados disponíveis</td></tr>';
+        return;
+    }
+
+    avariaMotivosTableBody.innerHTML = "";
+
+    limitedEntries.forEach((entry, index) => {
+        const tableRow = document.createElement("tr");
+        tableRow.className = "corte-top10-table__row avaria-motivos-table__row";
+
+        const rankCell = document.createElement("td");
+        rankCell.className =
+            "corte-top10-table__cell corte-top10-table__cell--rank avaria-motivos-table__cell avaria-motivos-table__cell--rank";
+        const rankBadge = document.createElement("span");
+        rankBadge.className = "corte-top10-table__rank-badge";
+        rankBadge.textContent = String(index + 1);
+        rankCell.appendChild(rankBadge);
+
+        const motiveCell = document.createElement("td");
+        motiveCell.className =
+            "corte-top10-table__cell corte-top10-table__cell--description avaria-motivos-table__cell avaria-motivos-table__cell--motivo";
+        const motiveLabel = entry.motive || "Motivo não informado";
+        motiveCell.textContent = motiveLabel;
+        if (entry.motive) {
+            motiveCell.title = entry.motive;
+        }
+
+        const valueCell = document.createElement("td");
+        valueCell.className =
+            "corte-top10-table__cell corte-top10-table__cell--valor avaria-motivos-table__cell avaria-motivos-table__cell--valor";
+        if (Number.isFinite(entry.value)) {
+            valueCell.textContent = currencyFormatter.format(entry.value);
+        } else if (entry.rawValue !== null && entry.rawValue !== undefined && entry.rawValue !== "") {
+            valueCell.textContent = String(entry.rawValue);
+        } else {
+            valueCell.textContent = "—";
+        }
+
+        const quantityCell = document.createElement("td");
+        quantityCell.className =
+            "corte-top10-table__cell corte-top10-table__cell--valor avaria-motivos-table__cell avaria-motivos-table__cell--quantidade";
+        if (Number.isFinite(entry.quantity)) {
+            quantityCell.textContent = decimalFormatter.format(entry.quantity);
+        } else if (entry.rawQuantity !== null && entry.rawQuantity !== undefined && entry.rawQuantity !== "") {
+            quantityCell.textContent = String(entry.rawQuantity);
+        } else {
+            quantityCell.textContent = "—";
+        }
+
+        const shareCell = document.createElement("td");
+        shareCell.className =
+            "corte-top10-table__cell corte-top10-table__cell--valor avaria-motivos-table__cell avaria-motivos-table__cell--participacao";
+        if (Number.isFinite(entry.share)) {
+            shareCell.textContent = percentageFormatter.format(entry.share);
+        } else if (entry.rawShare !== null && entry.rawShare !== undefined && entry.rawShare !== "") {
+            shareCell.textContent = String(entry.rawShare);
+        } else {
+            shareCell.textContent = "—";
+        }
+
+        tableRow.append(rankCell, motiveCell, valueCell, quantityCell, shareCell);
+        avariaMotivosTableBody.appendChild(tableRow);
     });
 }
 
@@ -5169,6 +5956,28 @@ function collectInventarioMetricElements() {
     }, {});
 }
 
+function collectAvariaMetricElements() {
+    const mapping = [
+        ["top-sector", "topSector"],
+        ["total-value", "totalValue"],
+        ["top-motive", "topMotive"],
+        ["top-destination", "topDestination"],
+        ["top-shift", "topShift"],
+    ];
+
+    return mapping.reduce((accumulator, [selector, key]) => {
+        const card = document.querySelector(`[data-avaria-metric="${selector}"]`);
+        accumulator[key] = card
+            ? {
+                  card,
+                  value: card.querySelector(".metric-card__value"),
+                  context: card.querySelector(".metric-card__context"),
+              }
+            : null;
+        return accumulator;
+    }, {});
+}
+
 function renderMetrics(metrics) {
     if (!metricsDOM) {
         return;
@@ -5406,6 +6215,25 @@ function clearInventarioMetrics() {
     });
 }
 
+function clearAvariaMetrics() {
+    if (!avariaMetricsDOM) {
+        avariaMetricsDOM = collectAvariaMetricElements();
+    }
+
+    if (!avariaMetricsDOM) {
+        return;
+    }
+
+    Object.values(avariaMetricsDOM).forEach((entry) => {
+        if (!entry || !entry.value || !entry.context) {
+            return;
+        }
+        entry.card.dataset.tone = "empty";
+        entry.value.innerHTML = '<span class="metric-card__value-text">&mdash;</span>';
+        entry.context.textContent = "Sem dados";
+    });
+}
+
 function findInventarioExtremum(dataset, mode) {
     if (!dataset) {
         return null;
@@ -5540,6 +6368,265 @@ function computeInventarioDivergence(dataset) {
         worstDiff,
         worstLabel,
     };
+}
+
+function updateAvariaMetrics() {
+    if (!avariaMetricsDOM) {
+        avariaMetricsDOM = collectAvariaMetricElements();
+    }
+
+    if (!avariaMetricsDOM) {
+        return;
+    }
+
+    const sectors = Array.isArray(avariaSetoresDatasetCache) ? avariaSetoresDatasetCache : [];
+    const motives = Array.isArray(avariaMotivosSummary) ? avariaMotivosSummary : [];
+    const destinations = Array.isArray(avariaDirecionadosDataset) ? avariaDirecionadosDataset : [];
+    const shifts = Array.isArray(avariaTurnosDataset) ? avariaTurnosDataset : [];
+
+    const sectorEntriesWithValue = sectors.filter((entry) => Number.isFinite(entry?.value));
+    const sectorEntriesWithQuantity = sectors.filter((entry) => Number.isFinite(entry?.quantity));
+    const hasSectorData = sectorEntriesWithValue.length > 0 || sectorEntriesWithQuantity.length > 0;
+    const totalSectorValue = sectorEntriesWithValue.reduce((sum, entry) => sum + entry.value, 0);
+    const totalSectorQuantity = sectorEntriesWithQuantity.reduce((sum, entry) => sum + entry.quantity, 0);
+    const sectorCount = sectors.reduce((count, entry) => {
+        if (Number.isFinite(entry?.value) || Number.isFinite(entry?.quantity)) {
+            return count + 1;
+        }
+        return count;
+    }, 0);
+
+    let topSectorCandidate = sectorEntriesWithValue.reduce((best, entry) => {
+        if (!best || entry.value > best.value) {
+            return entry;
+        }
+        return best;
+    }, null);
+
+    if (!topSectorCandidate) {
+        topSectorCandidate = sectorEntriesWithQuantity.reduce((best, entry) => {
+            if (!best || entry.quantity > best.quantity) {
+                return entry;
+            }
+            return best;
+        }, null);
+    }
+
+    const topSectorData = topSectorCandidate
+        ? {
+              label: topSectorCandidate.label || "Sem setor",
+              value: Number.isFinite(topSectorCandidate.value) ? topSectorCandidate.value : null,
+              quantity: Number.isFinite(topSectorCandidate.quantity) ? topSectorCandidate.quantity : null,
+              share:
+                  Number.isFinite(topSectorCandidate.value) && totalSectorValue > 0
+                      ? topSectorCandidate.value / totalSectorValue
+                      : null,
+          }
+        : null;
+
+    if (avariaMetricsDOM.topSector) {
+        updateMetricCard(avariaMetricsDOM.topSector, topSectorData, {
+            defaultTone: "bad",
+            formatValue: (entry) => {
+                if (entry && Number.isFinite(entry.value)) {
+                    return currencyFormatter.format(entry.value);
+                }
+                if (entry && Number.isFinite(entry.quantity)) {
+                    return `${decimalFormatter.format(entry.quantity)} unid.`;
+                }
+                return "—";
+            },
+            formatContext: (entry) => {
+                if (!entry) {
+                    return "Sem setores avaliados";
+                }
+                const parts = [];
+                parts.push(entry.label || "Sem setor");
+                if (Number.isFinite(entry.share)) {
+                    parts.push(`${percentageFormatter.format(entry.share)} do total`);
+                }
+                if (Number.isFinite(entry.quantity)) {
+                    parts.push(`${decimalFormatter.format(entry.quantity)} unid.`);
+                }
+                return parts.join(" · ");
+            },
+            emptyContext: "Sem setores avaliados",
+        });
+    }
+
+    const destinationEntries = destinations.filter((entry) => Number.isFinite(entry?.value));
+    const totalDestinationValue = destinationEntries.reduce((sum, entry) => sum + entry.value, 0);
+    const hasDestinationData = destinationEntries.length > 0;
+
+    const recoveredEntries = destinations.filter((entry) => Number.isFinite(entry?.recovered));
+    const totalRecoveredValue = recoveredEntries.reduce((sum, entry) => sum + entry.recovered, 0);
+    const hasRecoveredData = recoveredEntries.length > 0;
+
+    const totalMetricAvailable = hasSectorData || hasDestinationData || hasRecoveredData;
+    const effectiveTotalValue = hasSectorData
+        ? totalSectorValue
+        : hasDestinationData
+            ? totalDestinationValue
+            : hasRecoveredData
+                ? totalRecoveredValue
+                : 0;
+
+    const totalSectorInfo = totalMetricAvailable
+        ? {
+              totalValue: effectiveTotalValue,
+              totalQuantity: hasSectorData ? totalSectorQuantity : null,
+              sectorCount: hasSectorData ? sectorCount : null,
+              totalRecovered: hasRecoveredData ? totalRecoveredValue : null,
+          }
+        : null;
+
+    if (avariaMetricsDOM.totalValue) {
+        updateMetricCard(avariaMetricsDOM.totalValue, totalSectorInfo, {
+            defaultTone: "neutral",
+            formatValue: (info) => {
+                const total = currencyFormatter.format(info?.totalValue || 0);
+                const recovered = Number.isFinite(info?.totalRecovered)
+                    ? currencyFormatter.format(info.totalRecovered)
+                    : null;
+                if (recovered) {
+                    return `${total}<span class="metric-card__value-secondary metric-card__value-secondary--positive">Recuperado: ${recovered}</span>`;
+                }
+                return total;
+            },
+            formatContext: (info) => {
+                if (!info) {
+                    return "Sem setores avaliados";
+                }
+                const parts = [];
+                if (Number.isFinite(info.sectorCount) && info.sectorCount > 0) {
+                    parts.push(`${info.sectorCount} setores`);
+                }
+                if (Number.isFinite(info.totalQuantity) && info.totalQuantity > 0) {
+                    parts.push(`${decimalFormatter.format(info.totalQuantity)} unid.`);
+                }
+                if (!parts.length) {
+                    return "Sem detalhes";
+                }
+                return parts.join(" · ");
+            },
+            emptyContext: "Sem setores avaliados",
+        });
+    }
+
+    const motiveEntries = motives.filter((entry) =>
+        Number.isFinite(entry?.value) || Number.isFinite(entry?.share) || Number.isFinite(entry?.quantity)
+    );
+    const totalMotiveValue = motiveEntries.reduce(
+        (sum, entry) => sum + (Number.isFinite(entry.value) ? entry.value : 0),
+        0
+    );
+    const topMotiveCandidate = motiveEntries.length ? motiveEntries[0] : null;
+    const topMotiveData = topMotiveCandidate
+        ? {
+              label: topMotiveCandidate.motive || "Sem motivo",
+              value: Number.isFinite(topMotiveCandidate.value) ? topMotiveCandidate.value : null,
+              quantity: Number.isFinite(topMotiveCandidate.quantity) ? topMotiveCandidate.quantity : null,
+              share: Number.isFinite(topMotiveCandidate.share)
+                  ? topMotiveCandidate.share
+                  : totalMotiveValue > 0 && Number.isFinite(topMotiveCandidate.value)
+                      ? topMotiveCandidate.value / totalMotiveValue
+                      : null,
+          }
+        : null;
+
+    if (avariaMetricsDOM.topMotive) {
+        updateMetricCard(avariaMetricsDOM.topMotive, topMotiveData, {
+            defaultTone: "bad",
+            formatValue: (entry) => {
+                if (entry && Number.isFinite(entry.value)) {
+                    return currencyFormatter.format(entry.value);
+                }
+                if (entry && Number.isFinite(entry.quantity)) {
+                    return `${decimalFormatter.format(entry.quantity)} unid.`;
+                }
+                return "—";
+            },
+            formatContext: (entry) => {
+                if (!entry) {
+                    return "Sem motivos avaliados";
+                }
+                const parts = [];
+                parts.push(entry.label || "Sem motivo");
+                if (Number.isFinite(entry.share)) {
+                    parts.push(`${percentageFormatter.format(entry.share)} do total`);
+                }
+                if (Number.isFinite(entry.quantity)) {
+                    parts.push(`${decimalFormatter.format(entry.quantity)} unid.`);
+                }
+                return parts.join(" · ");
+            },
+            emptyContext: "Sem motivos avaliados",
+        });
+    }
+
+    const visibleDestinationEntries = destinationEntries.filter((entry) => !entry.placeholder);
+    const topDestinationCandidate = visibleDestinationEntries.length ? visibleDestinationEntries[0] : null;
+    const topDestinationData = topDestinationCandidate
+        ? {
+              label: topDestinationCandidate.label || "Sem destino",
+              value: topDestinationCandidate.value,
+              share:
+                  totalDestinationValue > 0 ? topDestinationCandidate.value / totalDestinationValue : null,
+              recovered: Number.isFinite(topDestinationCandidate.recovered) ? topDestinationCandidate.recovered : null,
+          }
+        : null;
+
+    if (avariaMetricsDOM.topDestination) {
+        updateMetricCard(avariaMetricsDOM.topDestination, topDestinationData, {
+            defaultTone: "neutral",
+            formatValue: (entry) => currencyFormatter.format(entry?.value || 0),
+            formatContext: (entry) => {
+                if (!entry) {
+                    return "Sem direcionamentos avaliados";
+                }
+                const parts = [];
+                parts.push(entry.label || "Sem destino");
+                if (Number.isFinite(entry.share)) {
+                    parts.push(`${percentageFormatter.format(entry.share)} do total`);
+                }
+                if (Number.isFinite(entry.recovered)) {
+                    parts.push(`Recuperado: ${currencyFormatter.format(entry.recovered)}`);
+                }
+                return parts.join(" · ");
+            },
+            emptyContext: "Sem direcionamentos avaliados",
+        });
+    }
+
+    const shiftEntries = shifts.filter((entry) => Number.isFinite(entry?.value));
+    const totalShiftValue = shiftEntries.reduce((sum, entry) => sum + entry.value, 0);
+    const topShiftCandidate = shiftEntries.length ? shiftEntries[0] : null;
+    const topShiftData = topShiftCandidate
+        ? {
+              label: topShiftCandidate.label || "Sem turno",
+              value: topShiftCandidate.value,
+              share: totalShiftValue > 0 ? topShiftCandidate.value / totalShiftValue : null,
+          }
+        : null;
+
+    if (avariaMetricsDOM.topShift) {
+        updateMetricCard(avariaMetricsDOM.topShift, topShiftData, {
+            defaultTone: "neutral",
+            formatValue: (entry) => currencyFormatter.format(entry?.value || 0),
+            formatContext: (entry) => {
+                if (!entry) {
+                    return "Sem turnos avaliados";
+                }
+                const parts = [];
+                parts.push(entry.label || "Sem turno");
+                if (Number.isFinite(entry.share)) {
+                    parts.push(`${percentageFormatter.format(entry.share)} do total`);
+                }
+                return parts.join(" · ");
+            },
+            emptyContext: "Sem turnos avaliados",
+        });
+    }
 }
 
 function updateInventarioMetrics() {
@@ -5972,6 +7059,25 @@ function updateCorteMetrics() {
             formatContext: (entry) => entry.motivo || "Sem descrição",
         });
     }
+}
+
+function isAvariaSecondaryVisible() {
+    return Boolean(avariaSecondarySection && avariaSecondarySection.getAttribute("aria-hidden") !== "true");
+}
+
+function scheduleAvariaSecondaryResize() {
+    if (!isAvariaSecondaryVisible()) {
+        return;
+    }
+
+    requestAnimationFrame(() => {
+        if (avariaDirecionadosChartInstance) {
+            avariaDirecionadosChartInstance.resize();
+        }
+        if (avariaTurnosChartInstance) {
+            avariaTurnosChartInstance.resize();
+        }
+    });
 }
 
 function removeExistingTooltip(canvasElement) {
