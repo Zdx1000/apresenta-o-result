@@ -17,6 +17,10 @@
 					<span class="dashboard__tab-icon material-symbols-rounded" aria-hidden="true">stacked_bar_chart</span>
 					<span class="dashboard__tab-label">R$ Bloq. no ESTOQUE</span>
 				</button>
+				<button type="button" class="dashboard__tab" role="tab" aria-selected="false" aria-controls="slide-funnel" data-slide-target="funnel" tabindex="-1">
+					<span class="dashboard__tab-icon material-symbols-rounded" aria-hidden="true">filter_alt</span>
+					<span class="dashboard__tab-label">Bloqueado Funnel</span>
+				</button>
 				<button type="button" class="dashboard__tab" role="tab" aria-selected="false" aria-controls="slide-faturamento" data-slide-target="faturamento" tabindex="-1">
 					<span class="dashboard__tab-icon material-symbols-rounded" aria-hidden="true">analytics</span>
 					<span class="dashboard__tab-label">Corte por Faturamento</span>
@@ -28,10 +32,6 @@
 				<button type="button" class="dashboard__tab" role="tab" aria-selected="false" aria-controls="slide-avaria" data-slide-target="avaria" tabindex="-1">
 					<span class="dashboard__tab-icon material-symbols-rounded" aria-hidden="true">handyman</span>
 					<span class="dashboard__tab-label">Avaria - Avariados</span>
-				</button>
-				<button type="button" class="dashboard__tab" role="tab" aria-selected="false" aria-controls="slide-funnel" data-slide-target="funnel" tabindex="-1">
-					<span class="dashboard__tab-icon material-symbols-rounded" aria-hidden="true">filter_alt</span>
-					<span class="dashboard__tab-label">Bloqueado Funnel</span>
 				</button>
 				<button type="button" class="dashboard__tab" role="tab" aria-selected="false" aria-controls="slide-senha-falta" data-slide-target="senha-falta" tabindex="-1">
 					<span class="dashboard__tab-icon material-symbols-rounded" aria-hidden="true">report</span>
@@ -692,16 +692,35 @@
 											<table class="avaria-motivos-table__inner corte-top10-table__inner">
 											<thead>
 												<tr>
-														<th scope="col" class="avaria-motivos-table__heading corte-top10-table__heading avaria-motivos-table__heading--rank">#</th>
-														<th scope="col" class="avaria-motivos-table__heading corte-top10-table__heading avaria-motivos-table__heading--motivo">Motivo</th>
-														<th scope="col" class="avaria-motivos-table__heading corte-top10-table__heading avaria-motivos-table__heading--valor">Valor avariado</th>
-														<th scope="col" class="avaria-motivos-table__heading corte-top10-table__heading avaria-motivos-table__heading--quantidade">Quantidade</th>
-														<th scope="col" class="avaria-motivos-table__heading corte-top10-table__heading avaria-motivos-table__heading--participacao">Participação</th>
+													<th scope="col" class="avaria-motivos-table__heading corte-top10-table__heading avaria-motivos-table__heading--motivo">
+														<span class="corte-top10-table__header-content avaria-motivos-table__header-content">
+															<span class="material-symbols-rounded corte-top10-table__header-icon avaria-motivos-table__header-icon" aria-hidden="true">fact_check</span>
+															<span class="avaria-motivos-table__header-label">Motivos de avaria</span>
+														</span>
+													</th>
+													<th scope="col" class="avaria-motivos-table__heading corte-top10-table__heading avaria-motivos-table__heading--valor">
+														<span class="corte-top10-table__header-content avaria-motivos-table__header-content">
+															<span class="material-symbols-rounded corte-top10-table__header-icon avaria-motivos-table__header-icon" aria-hidden="true">payments</span>
+															<span class="avaria-motivos-table__header-label">Valor avariado</span>
+														</span>
+													</th>
+													<th scope="col" class="avaria-motivos-table__heading corte-top10-table__heading avaria-motivos-table__heading--quantidade">
+														<span class="corte-top10-table__header-content avaria-motivos-table__header-content">
+															<span class="material-symbols-rounded corte-top10-table__header-icon avaria-motivos-table__header-icon" aria-hidden="true">inventory_2</span>
+															<span class="avaria-motivos-table__header-label">Quantidade</span>
+														</span>
+													</th>
+													<th scope="col" class="avaria-motivos-table__heading corte-top10-table__heading avaria-motivos-table__heading--participacao">
+														<span class="corte-top10-table__header-content avaria-motivos-table__header-content">
+															<span class="material-symbols-rounded corte-top10-table__header-icon avaria-motivos-table__header-icon" aria-hidden="true">pie_chart</span>
+															<span class="avaria-motivos-table__header-label">Participação</span>
+														</span>
+													</th>
 												</tr>
 											</thead>
 												<tbody class="avaria-motivos-table__body" data-avaria-motivos-body>
 													<tr class="avaria-motivos-table__empty corte-top10-table__empty">
-													<td colspan="5">Sem dados disponíveis</td>
+													<td colspan="4">Sem dados disponíveis</td>
 												</tr>
 											</tbody>
 											</table>
@@ -821,6 +840,40 @@
 						</div>
 					</aside>
 				</section>
+			</section>
+			<section class="dashboard__panel dashboard__panel--slide panel--animate" id="slide-senha-falta" data-slide-id="senha-falta" aria-labelledby="panel-senha-falta-title">
+				<header class="panel__header">
+					<div class="panel__titles">
+						<h1 class="panel__title" id="panel-senha-falta-title">Senha Falta</h1>
+						<p class="panel__subtitle">Pré-visualização temporária da senha 167</p>
+					</div>
+				</header>
+				<div class="senha-placeholder-panel" role="presentation">
+					<iframe
+						class="senha-placeholder-panel__frame"
+						src="/visual/senha/falta"
+						title="Visualização provisória da senha falta"
+						loading="lazy"
+						referrerpolicy="no-referrer"
+					></iframe>
+				</div>
+			</section>
+			<section class="dashboard__panel dashboard__panel--slide panel--animate" id="slide-senha-corte" data-slide-id="senha-corte" aria-labelledby="panel-senha-corte-title">
+				<header class="panel__header">
+					<div class="panel__titles">
+						<h1 class="panel__title" id="panel-senha-corte-title">Senha Corte</h1>
+						<p class="panel__subtitle">Pré-visualização temporária da senha 171</p>
+					</div>
+				</header>
+				<div class="senha-placeholder-panel" role="presentation">
+					<iframe
+						class="senha-placeholder-panel__frame"
+						src="/visual/senha/corte"
+						title="Visualização provisória da senha corte"
+						loading="lazy"
+						referrerpolicy="no-referrer"
+					></iframe>
+				</div>
 			</section>
 		</div>
 	</main>

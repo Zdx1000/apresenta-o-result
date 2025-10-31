@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        :root {
+            color-scheme: light;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            background: radial-gradient(circle at top, rgba(240, 245, 255, 0.92), rgba(223, 231, 248, 0.96));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: clamp(18px, 5vw, 42px);
+        }
+
+        .senha-placeholder {
+            width: min(100%, 920px);
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.92);
+            box-shadow: 0 22px 48px rgba(11, 31, 84, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+            padding: clamp(16px, 4vw, 32px);
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .senha-placeholder__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .senha-placeholder__title {
+            margin: 0;
+            font-size: clamp(1.2rem, 2.8vw, 1.55rem);
+            font-weight: 700;
+            color: rgba(10, 34, 84, 0.92);
+        }
+
+        .senha-placeholder__badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(10, 34, 84, 0.1);
+            color: rgba(10, 34, 84, 0.74);
+            font-weight: 600;
+            font-size: 0.82rem;
+        }
+
+        .senha-placeholder__figure {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .senha-placeholder__image-wrapper {
+            position: relative;
+            border-radius: 16px;
+            overflow: hidden;
+            background: rgba(10, 31, 84, 0.06);
+            box-shadow: inset 0 0 0 1px rgba(10, 31, 84, 0.08);
+            display: flex;
+            justify-content: center;
+            cursor: zoom-in;
+        }
+
+        .senha-placeholder__image {
+            display: block;
+            width: 100%;
+            height: auto;
+            object-fit: contain;
+        }
+
+        .senha-placeholder__caption {
+            margin: 0;
+            color: rgba(31, 42, 66, 0.7);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .senha-placeholder__lightbox {
+            position: fixed;
+            inset: 0;
+            background: rgba(6, 18, 46, 0.76);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: clamp(12px, 6vw, 48px);
+            z-index: 9999;
+            transition: opacity 0.22s ease;
+        }
+
+        .senha-placeholder__lightbox[hidden] {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .senha-placeholder__lightbox-inner {
+            position: relative;
+            width: min(100%, 1880px);
+            height: min(96vh, 1080px);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .senha-placeholder__lightbox-viewport {
+            flex: 1 1 auto;
+            overflow: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: 0 32px 72px rgba(0, 0, 0, 0.32);
+        }
+
+        .senha-placeholder__lightbox-viewport.is-zoomed {
+            align-items: flex-start;
+            justify-content: flex-start;
+        }
+
+        .senha-placeholder__lightbox-viewport::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+        }
+
+        .senha-placeholder__lightbox-viewport::-webkit-scrollbar-thumb {
+            background: rgba(10, 34, 84, 0.24);
+            border-radius: 999px;
+        }
+
+        .senha-placeholder__lightbox-viewport::-webkit-scrollbar-corner {
+            background: transparent;
+        }
+
+        .senha-placeholder__lightbox-image {
+            display: block;
+            max-width: none;
+            width: 100%;
+            height: auto;
+            border-radius: 18px;
+            object-fit: contain;
+            cursor: zoom-in;
+        }
+
+        .senha-placeholder__lightbox-close {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 999px;
+            border: none;
+            background: rgba(10, 34, 84, 0.84);
+            color: #f1f5ff;
+            font-family: inherit;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(6, 18, 46, 0.3);
+        }
+
+        .senha-placeholder__lightbox-close:focus-visible {
+            outline: 2px solid #d2e3ff;
+            outline-offset: 2px;
+        }
+
+        @media (max-width: 720px) {
+            body {
+                padding: 12px;
+            }
+
+            .senha-placeholder {
+                padding: 18px;
+                border-radius: 16px;
+            }
+
+            .senha-placeholder__header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="senha-placeholder" role="img" aria-label="{{ title }}">
+        <header class="senha-placeholder__header">
+            <h1 class="senha-placeholder__title">{{ title }}</h1>
+            {% if badge %}
+            <span class="senha-placeholder__badge">{{ badge }}</span>
+            {% endif %}
+        </header>
+        <figure class="senha-placeholder__figure">
+            <div class="senha-placeholder__image-wrapper">
+                <img class="senha-placeholder__image" src="{{ image_src }}" alt="{{ alt }}" loading="lazy" data-expandable>
+            </div>
+            {% if caption %}
+            <figcaption class="senha-placeholder__caption">{{ caption }}</figcaption>
+            {% endif %}
+        </figure>
+    </main>
+    <div class="senha-placeholder__lightbox" hidden data-lightbox>
+        <div class="senha-placeholder__lightbox-inner">
+            <button type="button" class="senha-placeholder__lightbox-close" data-close-lightbox>
+                Fechar
+            </button>
+            <div class="senha-placeholder__lightbox-viewport" data-lightbox-viewport>
+                <img class="senha-placeholder__lightbox-image" src="{{ image_src }}" alt="{{ alt }}" data-lightbox-image>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const previewImage = document.querySelector('[data-expandable]');
+            const lightbox = document.querySelector('[data-lightbox]');
+            const lightboxImage = document.querySelector('[data-lightbox-image]');
+            const viewport = document.querySelector('[data-lightbox-viewport]');
+            const closeButton = document.querySelector('[data-close-lightbox]');
+
+            if (!previewImage || !lightbox || !lightboxImage || !viewport) {
+                return;
+            }
+
+            let currentScale = 1;
+            let isPanning = false;
+            let isDragZoom = false;
+            let panStartX = 0;
+            let panStartY = 0;
+            let panScrollLeft = 0;
+            let panScrollTop = 0;
+            let dragZoomStartY = 0;
+            let dragZoomStartScale = 1;
+            let naturalWidth = 0;
+            let naturalHeight = 0;
+            let baseScale = 1;
+
+            const clampScale = (scale) => Math.min(Math.max(scale, 1), 4.5);
+
+            const applyCursorState = () => {
+                if (isDragZoom) {
+                    lightboxImage.style.cursor = 'ns-resize';
+                    viewport.style.cursor = 'ns-resize';
+                    return;
+                }
+
+                if (isPanning && currentScale > 1) {
+                    lightboxImage.style.cursor = 'grabbing';
+                    viewport.style.cursor = 'grabbing';
+                    return;
+                }
+
+                if (currentScale > 1) {
+                    lightboxImage.style.cursor = 'grab';
+                    viewport.style.cursor = 'grab';
+                } else {
+                    lightboxImage.style.cursor = 'zoom-in';
+                    viewport.style.cursor = 'default';
+                }
+            };
+
+            const computeBaseScale = () => {
+                if (!naturalWidth || !naturalHeight) {
+                    naturalWidth = lightboxImage.naturalWidth || lightboxImage.width;
+                    naturalHeight = lightboxImage.naturalHeight || lightboxImage.height;
+                }
+
+                if (!naturalWidth || !naturalHeight) {
+                    baseScale = 1;
+                    return;
+                }
+
+                const widthRatio = viewport.clientWidth / naturalWidth;
+                const heightRatio = viewport.clientHeight / naturalHeight;
+                baseScale = Math.min(widthRatio, heightRatio, 1);
+                if (baseScale <= 0) {
+                    baseScale = 1;
+                }
+            };
+
+            const applyScale = (scale) => {
+                if (!naturalWidth || !naturalHeight) {
+                    return;
+                }
+                const targetScale = baseScale * scale;
+                const targetWidth = naturalWidth * targetScale;
+                const targetHeight = naturalHeight * targetScale;
+                lightboxImage.style.width = `${targetWidth}px`;
+                lightboxImage.style.height = `${targetHeight}px`;
+            };
+
+            const updateZoom = (nextScale, options = {}) => {
+                const targetScale = clampScale(nextScale);
+                if (targetScale === currentScale) {
+                    return;
+                }
+
+                const prevWidth = lightboxImage.offsetWidth || (naturalWidth * baseScale * currentScale) || viewport.clientWidth;
+                const prevHeight = lightboxImage.offsetHeight || (naturalHeight * baseScale * currentScale) || viewport.clientHeight;
+                const anchorX = options.anchorX ?? (viewport.scrollLeft + viewport.clientWidth / 2);
+                const anchorY = options.anchorY ?? (viewport.scrollTop + viewport.clientHeight / 2);
+
+                currentScale = targetScale;
+                applyScale(currentScale);
+                viewport.classList.toggle('is-zoomed', currentScale > 1);
+
+                window.requestAnimationFrame(() => {
+                    const newWidth = lightboxImage.offsetWidth || (naturalWidth * baseScale * currentScale) || prevWidth;
+                    const newHeight = lightboxImage.offsetHeight || (naturalHeight * baseScale * currentScale) || prevHeight;
+                    const ratioX = newWidth / (prevWidth || 1);
+                    const ratioY = newHeight / (prevHeight || 1);
+
+                    const nextScrollLeft = anchorX * ratioX - viewport.clientWidth / 2;
+                    const nextScrollTop = anchorY * ratioY - viewport.clientHeight / 2;
+
+                    const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+                    const maxScrollTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+
+                    viewport.scrollLeft = Math.min(Math.max(0, nextScrollLeft), maxScrollLeft);
+                    viewport.scrollTop = Math.min(Math.max(0, nextScrollTop), maxScrollTop);
+                    applyCursorState();
+                });
+            };
+
+            const openLightbox = () => {
+                lightboxImage.src = previewImage.currentSrc || previewImage.src;
+                lightbox.removeAttribute('hidden');
+                document.body.style.overflow = 'hidden';
+                const initialize = () => {
+                    naturalWidth = lightboxImage.naturalWidth || lightboxImage.width;
+                    naturalHeight = lightboxImage.naturalHeight || lightboxImage.height;
+                    computeBaseScale();
+                    currentScale = 1;
+                    isPanning = false;
+                    isDragZoom = false;
+                    applyScale(currentScale);
+                    viewport.classList.remove('is-zoomed');
+                    viewport.scrollTo({ left: 0, top: 0, behavior: 'auto' });
+                    applyCursorState();
+                };
+
+                if (lightboxImage.complete) {
+                    initialize();
+                } else {
+                    lightboxImage.addEventListener('load', initialize, { once: true });
+                }
+            };
+
+            const closeLightbox = () => {
+                lightbox.setAttribute('hidden', '');
+                document.body.style.overflow = '';
+            };
+
+            const beginPan = (event) => {
+                if (currentScale <= 1) {
+                    return;
+                }
+
+                isPanning = true;
+                applyCursorState();
+
+                panStartX = event.clientX;
+                panStartY = event.clientY;
+                panScrollLeft = viewport.scrollLeft;
+                panScrollTop = viewport.scrollTop;
+
+                const handleMove = (moveEvent) => {
+                    const dx = moveEvent.clientX - panStartX;
+                    const dy = moveEvent.clientY - panStartY;
+                    viewport.scrollLeft = panScrollLeft - dx;
+                    viewport.scrollTop = panScrollTop - dy;
+                };
+
+                const handleUp = () => {
+                    document.removeEventListener('mousemove', handleMove);
+                    document.removeEventListener('mouseup', handleUp);
+                    isPanning = false;
+                    applyCursorState();
+                };
+
+                document.addEventListener('mousemove', handleMove);
+                document.addEventListener('mouseup', handleUp);
+            };
+
+            const beginDragZoom = (event) => {
+                isDragZoom = true;
+                applyCursorState();
+
+                dragZoomStartY = event.clientY;
+                dragZoomStartScale = currentScale;
+
+                const handleMove = (moveEvent) => {
+                    const delta = (dragZoomStartY - moveEvent.clientY) * 0.01;
+                    const anchorX = viewport.scrollLeft + viewport.clientWidth / 2;
+                    const anchorY = viewport.scrollTop + viewport.clientHeight / 2;
+                    updateZoom(dragZoomStartScale + delta, { anchorX, anchorY });
+                };
+
+                const handleUp = () => {
+                    document.removeEventListener('mousemove', handleMove);
+                    document.removeEventListener('mouseup', handleUp);
+                    isDragZoom = false;
+                    applyCursorState();
+                };
+
+                document.addEventListener('mousemove', handleMove);
+                document.addEventListener('mouseup', handleUp);
+            };
+
+            previewImage.addEventListener('dblclick', (event) => {
+                event.preventDefault();
+                if (lightbox.hasAttribute('hidden')) {
+                    openLightbox();
+                }
+            });
+
+            lightbox.addEventListener('dblclick', closeLightbox);
+            lightbox.addEventListener('click', (event) => {
+                if (event.target === lightbox) {
+                    closeLightbox();
+                }
+            });
+
+            if (closeButton) {
+                closeButton.addEventListener('click', closeLightbox);
+            }
+
+            viewport.addEventListener('wheel', (event) => {
+                event.preventDefault();
+                const rect = viewport.getBoundingClientRect();
+                const anchorX = viewport.scrollLeft + (event.clientX - rect.left);
+                const anchorY = viewport.scrollTop + (event.clientY - rect.top);
+                const delta = -event.deltaY * 0.0015;
+                updateZoom(currentScale + delta, { anchorX, anchorY });
+            }, { passive: false });
+
+            lightboxImage.addEventListener('contextmenu', (event) => {
+                event.preventDefault();
+            });
+
+            lightboxImage.addEventListener('dblclick', (event) => {
+                event.stopPropagation();
+                const rect = viewport.getBoundingClientRect();
+                const anchorX = viewport.scrollLeft + (event.clientX - rect.left);
+                const anchorY = viewport.scrollTop + (event.clientY - rect.top);
+
+                if (currentScale > 1) {
+                    updateZoom(1);
+                    viewport.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
+                } else {
+                    updateZoom(2, { anchorX, anchorY });
+                }
+            });
+
+            lightboxImage.addEventListener('mousedown', (event) => {
+                if (event.button === 2) {
+                    event.preventDefault();
+                    beginDragZoom(event);
+                    return;
+                }
+
+                if (event.button === 0) {
+                    if (currentScale <= 1 || event.altKey || event.shiftKey) {
+                        event.preventDefault();
+                        beginDragZoom(event);
+                        return;
+                    }
+
+                    if (currentScale > 1) {
+                        event.preventDefault();
+                        beginPan(event);
+                    }
+                }
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && !lightbox.hasAttribute('hidden')) {
+                    closeLightbox();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

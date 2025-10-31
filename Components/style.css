@@ -2104,11 +2104,6 @@ body {
 	text-align: left;
 }
 
-.avaria-motivos-table__heading--rank {
-	width: 68px;
-	text-align: center;
-}
-
 .avaria-motivos-table__heading--valor,
 .avaria-motivos-table__heading--quantidade,
 .avaria-motivos-table__heading--participacao {
@@ -2158,10 +2153,6 @@ body {
 	font-size: 0.88rem;
 	vertical-align: middle;
 	font-variant-numeric: tabular-nums;
-}
-
-.avaria-motivos-table__cell--rank {
-	text-align: center;
 }
 
 .avaria-motivos-table__cell--motivo {
@@ -3307,6 +3298,44 @@ body {
 .funnel-metric__icon .material-symbols-rounded {
 	font-size: 18px;
 	line-height: 1;
+}
+
+.senha-placeholder-panel {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: clamp(18px, 4vw, 36px);
+	min-height: clamp(360px, 60vh, 720px);
+	background: linear-gradient(135deg, rgba(244, 248, 255, 0.82), rgba(226, 233, 246, 0.86));
+	border-radius: 22px;
+	box-shadow: inset 0 0 0 1px rgba(10, 31, 84, 0.05);
+}
+
+.senha-placeholder-panel__frame {
+	width: min(100%, 980px);
+	min-height: clamp(340px, 58vh, 700px);
+	border: none;
+	border-radius: 20px;
+	box-shadow: 0 24px 48px rgba(11, 31, 84, 0.16);
+	background: rgba(255, 255, 255, 0.95);
+	overflow: hidden;
+}
+
+.senha-placeholder-panel__frame::-webkit-scrollbar {
+	width: 0;
+	height: 0;
+}
+
+@media (max-width: 960px) {
+	.senha-placeholder-panel {
+		padding: clamp(14px, 5vw, 26px);
+		border-radius: 18px;
+	}
+
+	.senha-placeholder-panel__frame {
+		border-radius: 16px;
+		min-height: clamp(320px, 62vh, 640px);
+	}
 }
 
 @media (max-width: 1024px) {

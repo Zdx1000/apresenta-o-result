@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, abort, jsonify, render_template, send_from_directory, url_for
 from flask_cors import CORS
 
 
@@ -59,6 +59,23 @@ DATA_SHEET_AVARIA_ITENS = "Avaria - Itens"
 DATA_SHEET_AVARIA_MOTIVOS = "Avaria - Motivos"
 DATA_SHEET_AVARIA_DIRECIONADOS = "Avaria - Direcionados"
 DATA_SHEET_AVARIA_TURNOS = "Avaria - Turnos"
+
+SENHA_PLACEHOLDER_CONFIG = {
+    "falta": {
+        "title": "Senha Falta",
+        "badge": "Senha 167",
+        "file": "Senha 167.png",
+        "caption": "Pré-visualização do layout provisório da senha falta.",
+        "alt": "Imagem da senha 167",
+    },
+    "corte": {
+        "title": "Senha Corte",
+        "badge": "Senha 171",
+        "file": "Senha 171.png",
+        "caption": "Pré-visualização do layout provisório da senha corte.",
+        "alt": "Imagem da senha 171",
+    },
+}
 
 def LoadData(file_path, sheet_name):
     try:
@@ -800,6 +817,36 @@ def get_senha_171():
     return jsonify(payload)
 
 
+@app.route("/media/senha/<string:kind>", methods=["GET"])
+def serve_senha_media(kind: str):
+    config = SENHA_PLACEHOLDER_CONFIG.get(kind)
+    if not config:
+        abort(404)
+
+    filename = config.get("file")
+    if not filename:
+        abort(404)
+
+    return send_from_directory(BASE_DIR, filename)
+
+
+@app.route("/visual/senha/<string:kind>", methods=["GET"])
+def render_senha_placeholder(kind: str):
+    config = SENHA_PLACEHOLDER_CONFIG.get(kind)
+    if not config:
+        abort(404)
+
+    image_src = url_for("serve_senha_media", kind=kind)
+    return render_template(
+        "senha_placeholder.html",
+        title=config.get("title", "Senha"),
+        badge=config.get("badge"),
+        caption=config.get("caption"),
+        image_src=image_src,
+        alt=config.get("alt", config.get("title", "Senha")),
+    )
+
+
 @app.route("/")
 def serve_root():
     return app.send_static_file("index.html")
@@ -813,6 +860,33 @@ def serve_favicon():
 @app.route("/backgroud.webp")
 def serve_background():
     return send_from_directory(BASE_DIR, "backgroud.webp")
+
+
+@app.route("/visual/senha/<tipo>")
+def serve_senha_visual(tipo: str):
+    config = SENHA_PLACEHOLDER_CONFIG.get(tipo)
+    if not config:
+        abort(404)
+
+    image_path = BASE_DIR / config["file"]
+    if not image_path.exists():
+        abort(404)
+
+    image_url = url_for("serve_senha_image", filename=config["file"])
+
+    return render_template(
+        "senha_placeholder.html",
+        title=config["title"],
+        badge=config.get("badge"),
+        image_src=image_url,
+        caption=config.get("caption"),
+        alt=config.get("alt") or config["title"],
+    )
+
+
+@app.route("/static/senhas/<path:filename>")
+def serve_senha_image(filename: str):
+    return send_from_directory(BASE_DIR, filename)
 
 
 if __name__ == "__main__":

@@ -1883,6 +1883,51 @@ function normalizeAvariaTurnosRows(rows) {
     return filtered;
 }
 
+const AVARIA_TURNOS_PIE_LABELS_PLUGIN = {
+    id: "avariaTurnosPieLabels",
+    afterDatasetsDraw(chart, args, pluginOptions) {
+        const ctx = chart?.ctx;
+        if (!ctx) return;
+
+        const meta = chart.getDatasetMeta(0);
+        if (!meta || meta.hidden) return;
+
+        const dataset = chart.data.datasets[0];
+        if (!dataset) return;
+
+        const slices = meta.data || [];
+        const shares = Array.isArray(dataset._avariaShares) ? dataset._avariaShares : [];
+        const colors = Array.isArray(dataset.backgroundColor) ? dataset.backgroundColor : [];
+        const minShare = Number.isFinite(pluginOptions?.minShare) ? pluginOptions.minShare : 0.03;
+        const formatter = typeof pluginOptions?.formatter === "function"
+            ? pluginOptions.formatter
+            : (value) => percentageFormatter.format(value);
+
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.shadowColor = "transparent";
+
+        slices.forEach((slice, index) => {
+            const share = shares[index];
+            if (!slice || !Number.isFinite(share) || share <= minShare) {
+                return;
+            }
+
+            const label = formatter(share, index, dataset);
+            if (!label) return;
+
+            const position = slice.tooltipPosition();
+            const sliceColor = colors[index % colors.length];
+            ctx.fillStyle = getContrastingTextColor(sliceColor, "#ffffff");
+            ctx.font = pluginOptions?.font || "600 12px 'Segoe UI', Tahoma";
+            ctx.fillText(label, position.x, position.y);
+        });
+
+        ctx.restore();
+    },
+};
+
 function renderAvariaSetoresChart(rows) {
     const canvasElement = document.getElementById("avariaSetoresChart");
     if (!canvasElement) {
@@ -2528,6 +2573,7 @@ function renderAvariaTurnosChart(rows) {
                     borderWidth: 1.4,
                     hoverBorderColor: borderColors,
                     hoverOffset: 6,
+                    _avariaShares: shares,
                 },
             ],
         },
@@ -2547,7 +2593,7 @@ function renderAvariaTurnosChart(rows) {
                 },
             },
         },
-        plugins: [centerLabelPlugin],
+        plugins: [centerLabelPlugin, AVARIA_TURNOS_PIE_LABELS_PLUGIN],
     });
     scheduleAvariaSecondaryResize();
 }
@@ -2562,7 +2608,7 @@ function populateAvariaMotivosTable(entries) {
 
     if (!limitedEntries.length) {
         avariaMotivosTableBody.innerHTML =
-            '<tr class="avaria-motivos-table__empty corte-top10-table__empty"><td colspan="5">Sem dados disponíveis</td></tr>';
+            '<tr class="avaria-motivos-table__empty corte-top10-table__empty"><td colspan="4">Sem dados disponíveis</td></tr>';
         return;
     }
 
@@ -2571,14 +2617,9 @@ function populateAvariaMotivosTable(entries) {
     limitedEntries.forEach((entry, index) => {
         const tableRow = document.createElement("tr");
         tableRow.className = "corte-top10-table__row avaria-motivos-table__row";
-
-        const rankCell = document.createElement("td");
-        rankCell.className =
-            "corte-top10-table__cell corte-top10-table__cell--rank avaria-motivos-table__cell avaria-motivos-table__cell--rank";
-        const rankBadge = document.createElement("span");
-        rankBadge.className = "corte-top10-table__rank-badge";
-        rankBadge.textContent = String(index + 1);
-        rankCell.appendChild(rankBadge);
+        if (index < 3) {
+            tableRow.classList.add("is-highlight");
+        }
 
         const motiveCell = document.createElement("td");
         motiveCell.className =
@@ -2622,7 +2663,7 @@ function populateAvariaMotivosTable(entries) {
             shareCell.textContent = "—";
         }
 
-        tableRow.append(rankCell, motiveCell, valueCell, quantityCell, shareCell);
+        tableRow.append(motiveCell, valueCell, quantityCell, shareCell);
         avariaMotivosTableBody.appendChild(tableRow);
     });
 }
